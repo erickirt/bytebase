@@ -1,5 +1,6 @@
 import { uniqBy } from "lodash-es";
 import { ref, unref, watchEffect, computed, type MaybeRef } from "vue";
+import { isValidInstanceName } from "@/types";
 import type { InstanceResource } from "@/types/proto/v1/instance_service";
 import { useDatabaseV1Store } from "./database";
 import { useInstanceV1Store } from "./instance";
@@ -15,7 +16,7 @@ export const useInstanceResourceByName = (
 
   const instanceList = computed(() => {
     return uniqBy(
-      [...databaseStore.databaseList.map((db) => db.instanceResource)],
+      databaseStore.databaseList.map((db) => db.instanceResource),
       (i) => i.name
     ) as InstanceResource[];
   });
@@ -30,13 +31,18 @@ export const useInstanceResourceByName = (
   });
 
   const instance = computed(() => {
-    const instanceFromDb = instanceList.value.find(
-      (i) => i.name === unref(instanceName)
-    );
+    const name = unref(instanceName);
+    if (ready.value) {
+      const existed = store.getInstanceByName(name);
+      if (isValidInstanceName(existed.name)) {
+        return existed;
+      }
+    }
+    const instanceFromDb = instanceList.value.find((i) => i.name === name);
     if (instanceFromDb) {
       return instanceFromDb;
     }
-    return store.getInstanceByName(unref(instanceName));
+    return store.getInstanceByName(name);
   });
 
   return { instance, ready };

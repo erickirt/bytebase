@@ -44,11 +44,10 @@ type UserService struct {
 	profile        *config.Profile
 	stateCfg       *state.State
 	iamManager     *iam.Manager
-	postCreateUser func(ctx context.Context, user *store.UserMessage, firstEndUser bool) error
 }
 
 // NewUserService creates a new UserService.
-func NewUserService(store *store.Store, secret string, licenseService enterprise.LicenseService, metricReporter *metricreport.Reporter, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager, postCreateUser func(ctx context.Context, user *store.UserMessage, firstEndUser bool) error) *UserService {
+func NewUserService(store *store.Store, secret string, licenseService enterprise.LicenseService, metricReporter *metricreport.Reporter, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager) *UserService {
 	return &UserService{
 		store:          store,
 		secret:         secret,
@@ -57,7 +56,6 @@ func NewUserService(store *store.Store, secret string, licenseService enterprise
 		profile:        profile,
 		stateCfg:       stateCfg,
 		iamManager:     iamManager,
-		postCreateUser: postCreateUser,
 	}
 }
 
@@ -405,10 +403,6 @@ func (s *UserService) CreateUser(ctx context.Context, request *v1pb.CreateUserRe
 		}
 	}
 
-	if err := s.postCreateUser(ctx, user, firstEndUser); err != nil {
-		return nil, err
-	}
-
 	isFirstUser := user.ID == base.PrincipalIDForFirstUser
 	s.metricReporter.Report(ctx, &metric.Metric{
 		Name:  metricapi.PrincipalRegistrationMetricName,
@@ -696,14 +690,13 @@ func (s *UserService) getActiveUserCount(ctx context.Context) (int, error) {
 func (s *UserService) hasExtraWorkspaceAdmin(ctx context.Context, policy *storepb.IamPolicy, userID int) (bool, error) {
 	workspaceAdminRole := common.FormatRole(base.WorkspaceAdmin.String())
 	userMember := common.FormatUserUID(userID)
-	systemBotMember := common.FormatUserUID(base.SystemBotID)
 
 	for _, binding := range policy.GetBindings() {
 		if binding.GetRole() != workspaceAdminRole {
 			continue
 		}
 		for _, member := range binding.GetMembers() {
-			if member == userMember || member == systemBotMember {
+			if member == userMember {
 				continue
 			}
 			if member == base.AllUsers {

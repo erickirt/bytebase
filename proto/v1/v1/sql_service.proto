@@ -249,6 +249,26 @@ message QueryResult {
 
   // The query result is allowed to be exported or not.
   bool allow_export = 11;
+
+  message Message {
+    enum Level {
+      // Unspecified.
+      LEVEL_UNSPECIFIED = 0;
+      INFO = 1;
+      WARNING = 2;
+      DEBUG = 3;
+      LOG = 4;
+      NOTICE = 5;
+      EXCEPTION = 6;
+    }
+
+    Level level = 1;
+    string content = 2;
+  }
+
+  // Informational or debug messages returned by the database engine during query execution.
+  // Examples include PostgreSQL's RAISE NOTICE, MSSQL's PRINT, or Oracle's DBMS_OUTPUT.PUT_LINE.
+  repeated Message messages = 12;
 }
 
 message QueryRow {
@@ -462,12 +482,14 @@ message SearchQueryHistoriesRequest {
   string page_token = 2;
 
   // Filter is the filter to apply on the search query history
+  // The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+  //
   // Supported filter:
-  // - project
-  // - database
-  // - instance
-  // - type
-  // - statement
+  // - project: the project full name in "projects/{id}" format, support "==" operator.
+  // - database: the database full name in "instances/{id}/databases/{name}" format, support "==" operator.
+  // - instance: the instance full name in "instances/{id}" format, support "==" operator.
+  // - type: the type, should be "QUERY" or "EXPORT", support "==" operator.
+  // - statement: the SQL statemnt, support ".matches()" operator.
   //
   // For example:
   // project == "projects/{project}"
