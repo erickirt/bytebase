@@ -12,7 +12,13 @@
             :readonly="!isCreating"
             :value="state.resourceId"
             :resource-title="state.placeholder"
-            :validate="validateResourceId"
+            :fetch-resource="
+              (id) =>
+                dbGroupStore.getOrFetchDBGroupByName(
+                  `${props.project.name}/${databaseGroupNamePrefix}${id}`,
+                  { silent: true }
+                )
+            "
           />
         </div>
       </div>
@@ -62,7 +68,6 @@
 import { cloneDeep, head, isEqual } from "lodash-es";
 import { Trash2Icon } from "lucide-vue-next";
 import { NButton, NDivider, NInput, useDialog } from "naive-ui";
-import { Status } from "nice-grpc-web";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -83,12 +88,11 @@ import {
   databaseGroupNamePrefix,
   getProjectNameAndDatabaseGroupName,
 } from "@/store/modules/v1/common";
-import type { ComposedProject, ResourceId, ValidatedMessage } from "@/types";
+import type { ComposedProject } from "@/types";
 import { Expr as CELExpr } from "@/types/proto/google/api/expr/v1alpha1/syntax";
 import { Expr } from "@/types/proto/google/type/expr";
 import type { DatabaseGroup } from "@/types/proto/v1/database_group_service";
 import { batchConvertParsedExprToCELString } from "@/utils";
-import { getErrorCode } from "@/utils/grpcweb";
 import { ResourceIdField } from "../v2";
 import MatchedDatabaseView from "./MatchedDatabaseView.vue";
 import {
@@ -139,7 +143,7 @@ onMounted(async () => {
     databaseGroup.name
   );
   state.resourceId = databaseGroupName;
-  state.placeholder = databaseGroupEntity.databasePlaceholder;
+  state.placeholder = databaseGroupEntity.title;
   const composedDatabaseGroup = await dbGroupStore.getOrFetchDBGroupByName(
     databaseGroup.name,
     { silent: true }
@@ -148,43 +152,6 @@ onMounted(async () => {
     state.expr = cloneDeep(composedDatabaseGroup.simpleExpr);
   }
 });
-
-const validateResourceId = async (
-  resourceId: ResourceId
-): Promise<ValidatedMessage[]> => {
-  if (!resourceId) {
-    return [];
-  }
-
-  const request = dbGroupStore.getOrFetchDBGroupByName(
-    `${props.project.name}/${databaseGroupNamePrefix}${resourceId}`,
-    { silent: true }
-  );
-
-  if (!request) {
-    return [];
-  }
-
-  try {
-    const data = await request;
-    if (data) {
-      return [
-        {
-          type: "error",
-          message: t("resource-id.validation.duplicated", {
-            resource: t(`resource.database-group`),
-          }),
-        },
-      ];
-    }
-  } catch (error) {
-    if (getErrorCode(error) !== Status.NOT_FOUND) {
-      throw error;
-    }
-  }
-
-  return [];
-};
 
 const doDelete = () => {
   dialog.error({
@@ -255,7 +222,7 @@ const doConfirm = async () => {
       projectName: props.project.name,
       databaseGroup: {
         name: `${props.project.name}/databaseGroups/${resourceId}`,
-        databasePlaceholder: formState.placeholder,
+        title: formState.placeholder,
         databaseExpr: Expr.fromPartial({
           expression: celString,
         }),
@@ -269,9 +236,7 @@ const doConfirm = async () => {
     }
 
     const updateMask: string[] = [];
-    if (
-      !isEqual(props.databaseGroup.databasePlaceholder, formState.placeholder)
-    ) {
+    if (!isEqual(props.databaseGroup.title, formState.placeholder)) {
       updateMask.push("database_placeholder");
     }
     if (
@@ -287,7 +252,7 @@ const doConfirm = async () => {
     await dbGroupStore.updateDatabaseGroup(
       {
         ...props.databaseGroup!,
-        databasePlaceholder: formState.placeholder,
+        title: formState.placeholder,
         databaseExpr: Expr.fromPartial({
           expression: celString,
         }),

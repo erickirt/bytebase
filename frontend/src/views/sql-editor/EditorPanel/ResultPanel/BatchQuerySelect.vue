@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="queriedDatabaseNames.length > 1"
-    class="w-full flex flex-row justify-start items-center p-2 pb-0 gap-2 shrink-0 overflow-x-auto hide-scrollbar"
+    class="w-full flex flex-row justify-start items-center p-2 pb-0 gap-2 shrink-0"
   >
     <NTooltip v-if="showEmptySwitch">
       <template #trigger>
@@ -21,29 +21,24 @@
       </template>
     </NTooltip>
 
-    <NTooltip
-      v-for="item in filteredItems"
-      :key="item.database.name"
-      trigger="hover"
-    >
-      <template #trigger>
+    <NScrollbar x-scrollable class="pb-2">
+      <div class="flex flex-row justify-start items-center gap-2">
         <NButton
+          v-for="item in filteredItems"
+          :key="item.database.name"
           secondary
           strong
           size="small"
-          :type="selectedDatabase === item.database ? 'primary' : 'default'"
+          :type="'default'"
+          :style="{
+            ...getBackgroundColorRgb(item.database),
+            borderTop: selectedDatabase === item.database ? '3px solid' : '',
+          }"
           @click="$emit('update:selected-database', item.database)"
         >
-          <InstanceV1EngineIcon
-            :instance="item.database.instanceResource"
-            :tooltip="false"
-          />
-          <span class="mx-2 opacity-60">{{
-            item.database.effectiveEnvironmentEntity.title
-          }}</span>
-          <span>{{ item.database.databaseName }}</span>
+          <RichDatabaseName :database="item.database" />
           <InfoIcon
-            v-if="isDatabaseQueryFailed(item.database)"
+            v-if="isDatabaseQueryFailed(item)"
             class="ml-1 text-yellow-600 w-4 h-auto"
           />
           <span
@@ -57,22 +52,22 @@
             @click.stop="handleCloseSingleResultView(item.database)"
           />
         </NButton>
-      </template>
-      {{ item.database.instanceResource.title }}
-    </NTooltip>
+      </div>
+    </NScrollbar>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useLocalStorage } from "@vueuse/core";
-import { head } from "lodash-es";
+import { head, last } from "lodash-es";
 import { EyeIcon, EyeOffIcon, InfoIcon, XIcon } from "lucide-vue-next";
-import { NButton, NTooltip } from "naive-ui";
+import { NButton, NTooltip, NScrollbar } from "naive-ui";
 import { storeToRefs } from "pinia";
 import { computed, watch } from "vue";
-import { InstanceV1EngineIcon } from "@/components/v2";
+import { RichDatabaseName } from "@/components/v2";
 import { useDatabaseV1Store, useSQLEditorTabStore } from "@/store";
 import type { ComposedDatabase, SQLResultSetV1 } from "@/types";
+import { hexToRgb } from "@/utils";
 
 type BatchQueryItem = {
   database: ComposedDatabase;
@@ -102,8 +97,8 @@ const queriedDatabaseNames = computed(() =>
 const items = computed(() => {
   return queriedDatabaseNames.value.map<BatchQueryItem>((name) => {
     const database = databaseStore.getDatabaseByName(name);
-    const resultSet = tab.value?.queryContext?.results.get(name);
-    return { database, resultSet };
+    const result = last(tab.value?.queryContext?.results.get(name));
+    return { database, resultSet: result?.resultSet };
   });
 });
 
@@ -134,10 +129,12 @@ const showEmptySwitch = computed(() => {
   return items.value.some((item) => isEmptyQueryItem(item));
 });
 
-const isDatabaseQueryFailed = (database: ComposedDatabase) => {
-  const resultSet = tab.value?.queryContext?.results.get(database.name || "");
+const isDatabaseQueryFailed = (item: BatchQueryItem) => {
   // If there is any error in the result set, we consider the query failed.
-  return resultSet?.error || resultSet?.results.find((result) => result.error);
+  return (
+    item.resultSet?.error ||
+    item.resultSet?.results.find((result) => result.error)
+  );
 };
 
 const handleCloseSingleResultView = (database: ComposedDatabase) => {
@@ -157,4 +154,16 @@ watch(
     immediate: true,
   }
 );
+
+const getBackgroundColorRgb = (database: ComposedDatabase) => {
+  const color = hexToRgb(
+    database.effectiveEnvironmentEntity.color || "#4f46e5"
+  ).join(", ");
+  return {
+    backgroundColor: `rgba(${color}, 0.1)`,
+    borderTopColor: `rgb(${color})`,
+    color: `rgb(${color})`,
+    borderTop: "3px solid",
+  };
+};
 </script>

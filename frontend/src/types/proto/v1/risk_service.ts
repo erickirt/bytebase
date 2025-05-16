@@ -47,6 +47,14 @@ export interface CreateRiskRequest {
   risk: Risk | undefined;
 }
 
+export interface GetRiskRequest {
+  /**
+   * The name of the risk to retrieve.
+   * Format: risks/{risk}
+   */
+  name: string;
+}
+
 export interface UpdateRiskRequest {
   /**
    * The risk to update.
@@ -76,6 +84,72 @@ export interface Risk {
   title: string;
   level: number;
   active: boolean;
+  /**
+   * The condition that is associated with the risk.
+   * The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+   *
+   * All supported variables:
+   * affected_rows: affected row count in the DDL/DML, support "==", "!=", "<", "<=", ">", ">=" operations.
+   * table_rows: table row count number, support "==", "!=", "<", "<=", ">", ">=" operations.
+   * environment_id: the environment resource id, support "==", "!=", "in [xx]", "!(in [xx])" operations.
+   * project_id: the project resource id, support "==", "!=", "in [xx]", "!(in [xx])", "contains()", "matches()", "startsWith()", "endsWith()" operations.
+   * db_engine: the database engine type, support "==", "!=", "in [xx]", "!(in [xx])" operations. Check the Engine enum for the values.
+   * sql_type: the SQL type, support "==", "!=", "in [xx]", "!(in [xx])" operations.
+   *  when the risk source is DDL, check https://github.com/bytebase/bytebase/blob/main/frontend/src/plugins/cel/types/values.ts#L70 for supported values.
+   *  when the risk source is DML, check https://github.com/bytebase/bytebase/blob/main/frontend/src/plugins/cel/types/values.ts#L71 for supported values.
+   * database_name: the database name, support "==", "!=", "in [xx]", "!(in [xx])", "contains()", "matches()", "startsWith()", "endsWith()" operations.
+   * schema_name: the schema name, support "==", "!=", "in [xx]", "!(in [xx])", "contains()", "matches()", "startsWith()", "endsWith()" operations.
+   * table_name: the table name, support "==", "!=", "in [xx]", "!(in [xx])", "contains()", "matches()", "startsWith()", "endsWith()" operations.
+   * sql_statement: the SQL statement, support "contains()", "matches()", "startsWith()", "endsWith()" operations.
+   * export_rows: export data count, support "==", "!=", "<", "<=", ">", ">=" operations.
+   * expiration_days: the role expiration days for the request, support "==", "!=", "<", "<=", ">", ">=" operations.
+   *
+   * When the risk source is DDL/DML, support following variables:
+   * affected_rows
+   * table_rows
+   * environment_id
+   * project_id
+   * db_engine
+   * sql_type
+   * database_name
+   * schema_name
+   * table_name
+   * sql_statement
+   *
+   * When the risk source is CREATE_DATABASE, support following variables:
+   * environment_id
+   * project_id
+   * db_engine
+   * database_name
+   *
+   * When the risk source is DATA_EXPORT, support following variables:
+   * environment_id
+   * project_id
+   * db_engine
+   * database_name
+   * schema_name
+   * table_name
+   * export_rows
+   *
+   * When the risk source is REQUEST_QUERY, support following variables:
+   * environment_id
+   * project_id
+   * db_engine
+   * database_name
+   * schema_name
+   * table_name
+   * expiration_days
+   *
+   * When the risk source is REQUEST_EXPORT, support following variables:
+   * environment_id
+   * project_id
+   * db_engine
+   * database_name
+   * schema_name
+   * table_name
+   * expiration_days
+   * export_rows
+   */
   condition: Expr | undefined;
 }
 
@@ -370,6 +444,64 @@ export const CreateRiskRequest: MessageFns<CreateRiskRequest> = {
   fromPartial(object: DeepPartial<CreateRiskRequest>): CreateRiskRequest {
     const message = createBaseCreateRiskRequest();
     message.risk = (object.risk !== undefined && object.risk !== null) ? Risk.fromPartial(object.risk) : undefined;
+    return message;
+  },
+};
+
+function createBaseGetRiskRequest(): GetRiskRequest {
+  return { name: "" };
+}
+
+export const GetRiskRequest: MessageFns<GetRiskRequest> = {
+  encode(message: GetRiskRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetRiskRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetRiskRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetRiskRequest {
+    return { name: isSet(object.name) ? globalThis.String(object.name) : "" };
+  },
+
+  toJSON(message: GetRiskRequest): unknown {
+    const obj: any = {};
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetRiskRequest>): GetRiskRequest {
+    return GetRiskRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetRiskRequest>): GetRiskRequest {
+    const message = createBaseGetRiskRequest();
+    message.name = object.name ?? "";
     return message;
   },
 };
@@ -683,6 +815,45 @@ export const RiskServiceDefinition = {
           800016: [new Uint8Array([1])],
           800024: [new Uint8Array([1])],
           578365826: [new Uint8Array([17, 58, 4, 114, 105, 115, 107, 34, 9, 47, 118, 49, 47, 114, 105, 115, 107, 115])],
+        },
+      },
+    },
+    getRisk: {
+      name: "GetRisk",
+      requestType: GetRiskRequest,
+      requestStream: false,
+      responseType: Risk,
+      responseStream: false,
+      options: {
+        _unknownFields: {
+          8410: [new Uint8Array([4, 110, 97, 109, 101])],
+          800010: [new Uint8Array([13, 98, 98, 46, 114, 105, 115, 107, 115, 46, 108, 105, 115, 116])],
+          800016: [new Uint8Array([1])],
+          578365826: [
+            new Uint8Array([
+              20,
+              18,
+              18,
+              47,
+              118,
+              49,
+              47,
+              123,
+              110,
+              97,
+              109,
+              101,
+              61,
+              114,
+              105,
+              115,
+              107,
+              115,
+              47,
+              42,
+              125,
+            ]),
+          ],
         },
       },
     },
