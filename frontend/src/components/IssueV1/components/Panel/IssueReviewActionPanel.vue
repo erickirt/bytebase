@@ -81,7 +81,7 @@
               <NButton
                 :disabled="confirmErrors.length > 0"
                 v-bind="confirmButtonProps"
-                @click="handleClickConfirm"
+                @click="handleConfirm"
               >
                 {{ $t("common.confirm") }}
               </NButton>
@@ -107,10 +107,10 @@ import {
   issueReviewActionButtonProps,
   issueReviewActionDisplayName,
   planCheckRunSummaryForIssue,
-  databaseForTask,
 } from "@/components/IssueV1/logic";
 import PlanCheckRunBar from "@/components/PlanCheckRun/PlanCheckRunBar.vue";
 import RequiredStar from "@/components/RequiredStar.vue";
+import { databaseForTask } from "@/components/Rollout/RolloutDetail";
 import { issueServiceClient } from "@/grpcweb";
 import { Issue_Approver_Status } from "@/types/proto/v1/issue_service";
 import { ErrorList } from "../common";
@@ -148,7 +148,7 @@ const title = computed(() => {
 });
 
 const database = computed(() =>
-  databaseForTask(issue.value, selectedTask.value)
+  databaseForTask(issue.value.projectEntity, selectedTask.value)
 );
 
 const showPerformActionAnyway = computed(() => {
@@ -205,32 +205,7 @@ const confirmButtonProps = computed(() => {
   return p;
 });
 
-const handleClickConfirm = (e: MouseEvent) => {
-  const button = e.target as HTMLElement;
-  const { left, top, width, height } = button.getBoundingClientRect();
-  const { innerWidth: winWidth, innerHeight: winHeight } = window;
-  const onSuccess = () => {
-    if (props.action !== "APPROVE") {
-      return;
-    }
-    // import the effect lib asynchronously
-    import("canvas-confetti").then(({ default: confetti }) => {
-      // Create a confetti effect from the position of the LGTM button
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: {
-          x: (left + width / 2) / winWidth,
-          y: (top + height / 2) / winHeight,
-        },
-      });
-    });
-  };
-
-  handleConfirm(onSuccess);
-};
-
-const handleConfirm = async (onSuccess: () => void) => {
+const handleConfirm = async () => {
   const { action } = props;
   if (!action) return;
   state.loading = true;
@@ -241,7 +216,6 @@ const handleConfirm = async (onSuccess: () => void) => {
         name: issue.value.name,
         comment: comment.value,
       });
-      onSuccess();
     } else if (status === Issue_Approver_Status.PENDING) {
       await issueServiceClient.requestIssue({
         name: issue.value.name,

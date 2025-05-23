@@ -1,7 +1,7 @@
 <template>
   <NConfigProvider
     v-bind="naiveUIConfig"
-    class="relative flex flex-col justify-start items-start p-2 pb-1 overflow-y-auto"
+    class="relative flex flex-col justify-start items-start pb-1 overflow-y-auto"
     :class="dark && 'dark bg-dark-bg'"
   >
     <template v-if="executeParams && resultSet && !showPlaceholder">
@@ -11,6 +11,7 @@
           :error="resultSet.results[0]?.error"
           :execute-params="executeParams"
           :result-set="resultSet"
+          @execute="$emit('execute', $event)"
         />
         <SingleResultViewV1
           v-else
@@ -22,7 +23,7 @@
       </template>
       <template v-else-if="viewMode === 'MULTI-RESULT'">
         <NTabs
-          type="card"
+          type="line"
           size="small"
           class="flex-1 flex flex-col overflow-hidden"
           style="--n-tab-padding: 4px 12px"
@@ -30,21 +31,29 @@
           <NTabPane
             v-for="(result, i) in filteredResults"
             :key="i"
-            :name="tabName(result, i)"
+            :name="tabName(i)"
             class="flex-1 flex flex-col overflow-hidden"
           >
             <template #tab>
-              <span>{{ tabName(result, i) }}</span>
-              <Info
-                v-if="result.error"
-                class="ml-2 text-yellow-600 w-4 h-auto"
-              />
+              <NTooltip>
+                <template #trigger>
+                  <div class="flex items-center space-x-2">
+                    <span>{{ tabName(i) }}</span>
+                    <Info
+                      v-if="result.error"
+                      class="text-yellow-600 w-4 h-auto"
+                    />
+                  </div>
+                </template>
+                {{ result.statement }}
+              </NTooltip>
             </template>
             <ErrorView
               v-if="result.error"
               :error="result.error"
               :execute-params="executeParams"
               :result-set="resultSet"
+              @execute="$emit('execute', $event)"
             />
             <SingleResultViewV1
               v-else
@@ -64,6 +73,7 @@
           :error="resultSet.error"
           :execute-params="executeParams"
           :result-set="resultSet"
+          @execute="$emit('execute', $event)"
         >
           <template #suffix>
             <RequestQueryButton
@@ -106,9 +116,14 @@
 
 <script lang="ts" setup>
 import { Info } from "lucide-vue-next";
-import { darkTheme, NConfigProvider, NTabs, NTabPane } from "naive-ui";
+import {
+  darkTheme,
+  NConfigProvider,
+  NTabs,
+  NTabPane,
+  NTooltip,
+} from "naive-ui";
 import { Status } from "nice-grpc-common";
-import type { PropType } from "vue";
 import { computed, ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { darkThemeOverrides } from "@/../naive-ui.config";
@@ -129,7 +144,6 @@ import type {
   DatabaseResource,
 } from "@/types";
 import { PolicyType } from "@/types/proto/v1/org_policy_service";
-import type { QueryResult } from "@/types/proto/v1/sql_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
 import DetailPanel from "./DetailPanel";
 import EmptyView from "./EmptyView.vue";
@@ -141,28 +155,25 @@ import { provideSQLResultViewContext } from "./context";
 
 type ViewMode = "SINGLE-RESULT" | "MULTI-RESULT" | "EMPTY" | "ERROR";
 
-const props = defineProps({
-  executeParams: {
-    type: Object as PropType<SQLEditorQueryParams>,
-    default: undefined,
-  },
-  database: {
-    type: Object as PropType<ComposedDatabase>,
-    default: undefined,
-  },
-  resultSet: {
-    type: Object as PropType<SQLResultSetV1>,
-    default: undefined,
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  dark: {
-    type: Boolean,
-    default: false,
-  },
-});
+const props = withDefaults(
+  defineProps<{
+    executeParams: SQLEditorQueryParams;
+    database: ComposedDatabase;
+    resultSet?: SQLResultSetV1;
+    loading?: boolean;
+    dark?: boolean;
+  }>(),
+  {
+    executeParams: undefined,
+    resultSet: undefined,
+    loading: false,
+    dark: false,
+  }
+);
+
+defineEmits<{
+  (event: "execute", params: SQLEditorQueryParams): void;
+}>();
 
 const { t } = useI18n();
 const policyStore = usePolicyV1Store();
@@ -239,7 +250,7 @@ const showPlaceholder = computed(() => {
   return false;
 });
 
-const tabName = (result: QueryResult, index: number) => {
+const tabName = (index: number) => {
   return `${t("common.query")} #${index + 1}`;
 };
 

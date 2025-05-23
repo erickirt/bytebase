@@ -9,14 +9,9 @@ import {
   resolveCELExpr,
 } from "@/plugins/cel";
 import { t } from "@/plugins/i18n";
-import { useUserStore } from "@/store";
-import { userNamePrefix } from "@/store/modules/v1/common";
-import { extractUserId } from "@/store/modules/v1/common";
 import type { ParsedApprovalRule, UnrecognizedApprovalRule } from "@/types";
 import {
   DEFAULT_RISK_LEVEL,
-  UNKNOWN_USER_NAME,
-  SYSTEM_BOT_EMAIL,
   PresetRoleType,
 } from "@/types";
 import type { LocalApprovalConfig, LocalApprovalRule } from "@/types";
@@ -306,11 +301,10 @@ export const seedWorkspaceApprovalSetting = () => {
       template: {
         title,
         description,
-        creator: `${userNamePrefix}${useUserStore().systemBotUser?.email ?? SYSTEM_BOT_EMAIL}`,
         flow: {
           steps: roles.map(
             (role): ApprovalStep => ({
-              type: ApprovalStep_Type.ALL,
+              type: ApprovalStep_Type.ANY,
               nodes: [
                 {
                   type: ApprovalNode_Type.ANY_IN_GROUP,
@@ -358,13 +352,8 @@ export const seedWorkspaceApprovalSetting = () => {
     const title =
       preset.title ??
       preset.roles.map((role) => approvalNodeRoleText(role)).join(" -> ");
-    const keypath = `custom-approval.approval-flow.presets.${preset.description}`;
+    const keypath = `dynamic.custom-approval.approval-flow.presets.${preset.description}`;
     const description = t(keypath);
     return generateRule(title, description, preset.roles);
   });
-};
-
-export const isReadonlyApprovalRule = (rule: LocalApprovalRule) => {
-  const creatorName = rule.template.creator ?? UNKNOWN_USER_NAME;
-  return extractUserId(creatorName) === SYSTEM_BOT_EMAIL;
 };

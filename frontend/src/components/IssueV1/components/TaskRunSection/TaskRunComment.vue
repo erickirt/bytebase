@@ -29,17 +29,19 @@ import { last } from "lodash-es";
 import { NEllipsis } from "naive-ui";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { databaseForTask } from "@/components/Rollout/RolloutDetail";
 import { getProjectIdRolloutUidStageUidTaskUid } from "@/store/modules/v1/common";
 import {
   unknownTask,
   isPostgresFamily,
   type ComposedTaskRun,
   getTimeForPbTimestamp,
+  getDateForPbTimestamp,
 } from "@/types";
 import { TaskRun_Status, Task_Type } from "@/types/proto/v1/rollout_service";
 import { databaseV1Url, extractTaskUID, flattenTaskV1List } from "@/utils";
 import { extractChangelogUID } from "@/utils/v1/changelog";
-import { databaseForTask, specForTask, useIssueContext } from "../../logic";
+import { specForTask, useIssueContext } from "../../logic";
 import { displayTaskRunLogEntryType } from "./TaskRunLogTable/common";
 
 export type CommentLink = {
@@ -75,13 +77,17 @@ const comment = computed(() => {
   if (taskRun.status === TaskRun_Status.PENDING) {
     if (earliestAllowedTime.value) {
       return t("task-run.status.enqueued-with-rollout-time", {
-        time: new Date(earliestAllowedTime.value).toLocaleString(),
+        time: new Date(earliestAllowedTime.value).toISOString(),
       });
     }
     if (taskRun.schedulerInfo) {
       const cause = taskRun.schedulerInfo.waitingCause;
       if (cause?.task) {
-        return t("task-run.status.waiting-task");
+        return t("task-run.status.waiting-task", {
+          time: getDateForPbTimestamp(
+            taskRun.schedulerInfo.reportTime
+          )?.toISOString(),
+        });
       }
     }
     return t("task-run.status.enqueued");
@@ -89,10 +95,25 @@ const comment = computed(() => {
     if (taskRun.schedulerInfo) {
       const cause = taskRun.schedulerInfo.waitingCause;
       if (cause?.connectionLimit) {
-        return t("task-run.status.waiting-connection");
+        return t("task-run.status.waiting-connection", {
+          time: getDateForPbTimestamp(
+            taskRun.schedulerInfo.reportTime
+          )?.toISOString(),
+        });
       }
       if (cause?.task) {
-        return t("task-run.status.waiting-task");
+        return t("task-run.status.waiting-task", {
+          time: getDateForPbTimestamp(
+            taskRun.schedulerInfo.reportTime
+          )?.toISOString(),
+        });
+      }
+      if (cause?.parallelTasksLimit) {
+        return t("task-run.status.waiting-max-tasks-per-rollout", {
+          time: getDateForPbTimestamp(
+            taskRun.schedulerInfo.reportTime
+          )?.toISOString(),
+        });
       }
     }
 
@@ -143,7 +164,7 @@ const commentLink = computed((): CommentLink => {
             link: "",
           };
         }
-        const db = databaseForTask(issue.value, task);
+        const db = databaseForTask(issue.value.projectEntity, task);
         const link = `${databaseV1Url(
           db
         )}/changelogs/${extractChangelogUID(taskRun.changelog)}`;
@@ -154,7 +175,7 @@ const commentLink = computed((): CommentLink => {
       }
     }
   } else if (taskRun.status === TaskRun_Status.FAILED) {
-    const db = databaseForTask(issue.value, task);
+    const db = databaseForTask(issue.value.projectEntity, task);
     // Cast a wide net to catch migration version error
     if (comment.value.includes("version")) {
       return {

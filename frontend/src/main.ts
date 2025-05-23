@@ -1,5 +1,4 @@
 import { VueQueryPlugin } from "@tanstack/vue-query";
-import "core-js/stable";
 import Long from "long";
 import protobufjs from "protobufjs";
 import "regenerator-runtime/runtime";
@@ -21,13 +20,7 @@ import {
   useAuthStore,
   useSubscriptionV1Store,
 } from "./store";
-import {
-  humanizeTs,
-  humanizeDurationV1,
-  humanizeDate,
-  isDev,
-  isRelease,
-} from "./utils";
+import { humanizeTs, humanizeDate, isDev, isRelease } from "./utils";
 
 protobufjs.util.Long = Long;
 protobufjs.configure();
@@ -43,23 +36,19 @@ console.debug("release:", isRelease());
   app.config.globalProperties.console = console;
   app.config.globalProperties.dayjs = dayjs;
   app.config.globalProperties.humanizeTs = humanizeTs;
-  app.config.globalProperties.humanizeDurationV1 = humanizeDurationV1;
   app.config.globalProperties.humanizeDate = humanizeDate;
   app.config.globalProperties.isDev = isDev();
   app.config.globalProperties.isRelease = isRelease();
 
   app.use(pinia);
 
-  const initStores = async () => {
-    await Promise.all([
-      useActuatorV1Store().fetchServerInfo(),
-      useSubscriptionV1Store().fetchSubscription(),
-      useSubscriptionV1Store().fetchFeatureMatrix(),
-      useAuthStore().fetchCurrentUser(),
-    ]);
-  };
-
-  await initStores();
+  // Initialize stores.
+  await Promise.all([
+    useActuatorV1Store().fetchServerInfo(),
+    useSubscriptionV1Store().fetchSubscription(),
+    useSubscriptionV1Store().fetchFeatureMatrix(),
+    useAuthStore().fetchCurrentUser(),
+  ]);
 
   app.use(router).use(highlight).use(i18n).use(NaiveUI).use(VueQueryPlugin);
 

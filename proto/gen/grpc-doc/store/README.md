@@ -593,7 +593,6 @@ offset.
 | flow | [ApprovalFlow](#bytebase-store-ApprovalFlow) |  |  |
 | title | [string](#string) |  |  |
 | description | [string](#string) |  |  |
-| creator_id | [int32](#int32) |  |  |
 
 
 
@@ -1714,6 +1713,7 @@ TablePartitionMetadata is the metadata for table partitions.
 | use_default | [string](#string) |  | The use_default is whether the users use the default partition, it stores the different value for different database engines. For MySQL, it&#39;s [INT] type, 0 means not use default partition, otherwise, it&#39;s equals to number in syntax [SUB]PARTITION {number}. |
 | subpartitions | [TablePartitionMetadata](#bytebase-store-TablePartitionMetadata) | repeated | The subpartitions is the list of subpartitions in a table partition. |
 | indexes | [IndexMetadata](#bytebase-store-IndexMetadata) | repeated |  |
+| check_constraints | [CheckConstraintMetadata](#bytebase-store-CheckConstraintMetadata) | repeated |  |
 
 
 
@@ -3548,6 +3548,7 @@ RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restrict
 | allow_self_approval | [bool](#bool) |  | Whether to allow the issue creator to self-approve the issue. |
 | execution_retry_policy | [Project.ExecutionRetryPolicy](#bytebase-store-Project-ExecutionRetryPolicy) |  | Execution retry policy for the task run. |
 | ci_sampling_size | [int32](#int32) |  | The maximum number of databases to sample during CI data validation. Without specification, sampling is disabled, resulting in a full validation. |
+| parallel_tasks_per_rollout | [int32](#int32) |  | The maximum number of parallel tasks to run during the rollout. |
 
 
 
@@ -4769,6 +4770,7 @@ We support three types of SMTP encryption: NONE, STARTTLS, and SSL/TLS.
 | ----- | ---- | ----- | ----------- |
 | connection_limit | [bool](#bool) |  |  |
 | task_uid | [int32](#int32) |  |  |
+| parallel_tasks_limit | [bool](#bool) |  |  |
 
 
 

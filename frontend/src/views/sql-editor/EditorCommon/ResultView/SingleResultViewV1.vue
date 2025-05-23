@@ -1,4 +1,13 @@
 <template>
+  <template v-if="result.messages.length > 0">
+    <div
+      v-for="(message, i) in result.messages"
+      :key="`message-${i}`"
+      :class="'text-control-light'"
+    >
+      <div>{{ `[${message.level}] ${message.content}` }}</div>
+    </div>
+  </template>
   <template v-if="viewMode === 'RESULT'">
     <BBAttention v-if="result.error" class="w-full mb-2" :type="'error'">
       <ErrorView :error="result.error" />
@@ -200,10 +209,14 @@ import {
   pushNotification,
   usePolicyByParentAndType,
   useStorageStore,
+  useSQLStore,
 } from "@/store";
-import { useExportData } from "@/store/modules/export";
 import type { ComposedDatabase, SQLEditorQueryParams } from "@/types";
-import { isValidDatabaseName, isValidInstanceName } from "@/types";
+import {
+  DEBOUNCE_SEARCH_DELAY,
+  isValidDatabaseName,
+  isValidInstanceName,
+} from "@/types";
 import { ExportFormat } from "@/types/proto/v1/common";
 import { Engine } from "@/types/proto/v1/common";
 import { PolicyType } from "@/types/proto/v1/org_policy_service";
@@ -331,7 +344,8 @@ const allowToRequestExportData = computed(() => {
 // use a debounced value to improve performance when typing rapidly
 const debouncedUpdateKeyword = useDebounceFn((value: string) => {
   keyword.value = value;
-}, 200);
+}, DEBOUNCE_SEARCH_DELAY);
+
 const updateKeyword = (value: string) => {
   state.search = value;
   debouncedUpdateKeyword(value);
@@ -445,7 +459,7 @@ const handleExportBtnClick = async (
   const limit = options.limit ?? (admin ? 0 : editorStore.resultRowsLimit);
 
   try {
-    const content = await useExportData().exportData({
+    const content = await useSQLStore().exportData({
       name: database,
       // TODO(lj): support data source id similar to queries.
       dataSourceId: "",

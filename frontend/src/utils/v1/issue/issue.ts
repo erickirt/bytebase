@@ -33,18 +33,19 @@ export const flattenSpecList = (plan: Plan | undefined) => {
   return plan?.steps.flatMap((step) => step.specs) || [];
 };
 
+const DATABASE_RELATED_TASK_TYPE_LIST = [
+  Task_Type.DATABASE_CREATE,
+  Task_Type.DATABASE_SCHEMA_BASELINE,
+  Task_Type.DATABASE_SCHEMA_UPDATE,
+  Task_Type.DATABASE_SCHEMA_UPDATE_GHOST,
+  Task_Type.DATABASE_SCHEMA_UPDATE_SDL,
+  Task_Type.DATABASE_DATA_UPDATE,
+];
+
 export const isDatabaseChangeRelatedIssue = (issue: ComposedIssue): boolean => {
   return (
     Boolean(issue.rollout) &&
     flattenTaskV1List(issue.rolloutEntity).some((task) => {
-      const DATABASE_RELATED_TASK_TYPE_LIST = [
-        Task_Type.DATABASE_CREATE,
-        Task_Type.DATABASE_SCHEMA_BASELINE,
-        Task_Type.DATABASE_SCHEMA_UPDATE,
-        Task_Type.DATABASE_SCHEMA_UPDATE_GHOST,
-        Task_Type.DATABASE_SCHEMA_UPDATE_SDL,
-        Task_Type.DATABASE_DATA_UPDATE,
-      ];
       return DATABASE_RELATED_TASK_TYPE_LIST.includes(task.type);
     })
   );
@@ -63,34 +64,39 @@ export const generateIssueTitle = (
     | "bb.issue.database.schema.update"
     | "bb.issue.database.data.update"
     | "bb.issue.database.data.export"
-    | "bb.issue.grant.request.querier"
-    | "bb.issue.grant.request.exporter",
-  databaseNameList: string[]
+    | "bb.issue.grant.request",
+  databaseNameList?: string[],
+  title?: string
 ) => {
   // Create a user friendly default issue name
   const parts: string[] = [];
-  if (databaseNameList.length === 0) {
-    parts.push(`[All databases]`);
-  } else if (databaseNameList.length === 1) {
-    parts.push(`[${databaseNameList[0]}]`);
-  } else {
-    parts.push(`[${databaseNameList.length} databases]`);
+
+  if (databaseNameList !== undefined) {
+    if (databaseNameList.length === 0) {
+      parts.push(`[All databases]`);
+    } else if (databaseNameList.length === 1) {
+      parts.push(`[${databaseNameList[0]}]`);
+    } else {
+      parts.push(`[${databaseNameList.length} databases]`);
+    }
   }
-  if (type.startsWith("bb.issue.database")) {
-    parts.push(
-      type === "bb.issue.database.schema.update"
-        ? t("issue.title.edit-schema")
-        : type === "bb.issue.database.data.update"
-          ? t("issue.title.change-data")
-          : t("issue.title.export-data")
-    );
+
+  if (title) {
+    parts.push(title);
   } else {
-    parts.push(
-      type === "bb.issue.grant.request.querier"
-        ? t("issue.title.request-querier-role")
-        : t("issue.title.request-exporter-role")
-    );
+    if (type.startsWith("bb.issue.database")) {
+      parts.push(
+        type === "bb.issue.database.schema.update"
+          ? t("issue.title.edit-schema")
+          : type === "bb.issue.database.data.update"
+            ? t("issue.title.change-data")
+            : t("issue.title.export-data")
+      );
+    } else {
+      parts.push(t("issue.title.request-role"));
+    }
   }
+
   const datetime = dayjs().format("@MM-DD HH:mm");
   const tz = "UTC" + dayjs().format("ZZ");
   parts.push(`${datetime} ${tz}`);

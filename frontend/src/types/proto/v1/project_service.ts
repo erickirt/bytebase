@@ -62,11 +62,13 @@ export interface SearchProjectsRequest {
   showDeleted: boolean;
   /**
    * Filter the project.
+   * The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+   *
    * Supported filters:
-   * - name
-   * - resource_id
-   * - exclude_default: if not include the default project.
-   * - state
+   * - name: the project name, support "==" and ".matches()" operator.
+   * - resource_id: the project id, support "==" and ".matches()" operator.
+   * - exclude_default: if not include the default project, should be "true" or "false", support "==" operator.
+   * - state: check the State enum for the values, support "==" operator.
    *
    * For example:
    * name = "project name"
@@ -215,6 +217,8 @@ export interface Project {
    * Without specification, sampling is disabled, resulting in a full validation.
    */
   ciSamplingSize: number;
+  /** The maximum number of parallel tasks to run during the rollout. */
+  parallelTasksPerRollout: number;
 }
 
 export interface Project_ExecutionRetryPolicy {
@@ -416,43 +420,8 @@ export enum Activity_Type {
   TYPE_ISSUE_APPROVAL_NOTIFY = "TYPE_ISSUE_APPROVAL_NOTIFY",
   /** TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE - TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE represents the pipeline stage status change, including BEGIN, END for now. */
   TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE = "TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE",
-  /** TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE - TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE represents the pipeline task status change, including PENDING, PENDING_APPROVAL, RUNNING, SUCCESS, FAILURE, CANCELED for now. */
-  TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE = "TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE",
   /** TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE - TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE represents the pipeline task run status change, including PENDING, RUNNING, DONE, FAILED, CANCELED. */
   TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE = "TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE",
-  /** TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE - TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE represents the manual update of the task statement. */
-  TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE = "TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE",
-  /** TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE - TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE represents the manual update of the task earliest allowed time. */
-  TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE = "TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE",
-  /**
-   * TYPE_MEMBER_CREATE - Member related activity types.
-   *
-   * TYPE_MEMBER_CREATE represents creating a members.
-   */
-  TYPE_MEMBER_CREATE = "TYPE_MEMBER_CREATE",
-  /** TYPE_MEMBER_ROLE_UPDATE - TYPE_MEMBER_ROLE_UPDATE represents updating the member role, for example, from ADMIN to MEMBER. */
-  TYPE_MEMBER_ROLE_UPDATE = "TYPE_MEMBER_ROLE_UPDATE",
-  /** TYPE_MEMBER_ACTIVATE - TYPE_MEMBER_ACTIVATE represents activating a deactivated member. */
-  TYPE_MEMBER_ACTIVATE = "TYPE_MEMBER_ACTIVATE",
-  /** TYPE_MEMBER_DEACTIVATE - TYPE_MEMBER_DEACTIVATE represents deactivating an active member. */
-  TYPE_MEMBER_DEACTIVATE = "TYPE_MEMBER_DEACTIVATE",
-  /**
-   * TYPE_PROJECT_REPOSITORY_PUSH - Project related activity types.
-   *
-   * TYPE_PROJECT_REPOSITORY_PUSH represents Bytebase receiving a push event from the project repository.
-   */
-  TYPE_PROJECT_REPOSITORY_PUSH = "TYPE_PROJECT_REPOSITORY_PUSH",
-  /** TYPE_PROJECT_DATABASE_TRANSFER - TYPE_PROJECT_DATABASE_TRANFER represents transfering the database from one project to another. */
-  TYPE_PROJECT_DATABASE_TRANSFER = "TYPE_PROJECT_DATABASE_TRANSFER",
-  /** TYPE_PROJECT_MEMBER_CREATE - TYPE_PROJECT_MEMBER_CREATE represents adding a member to the project. */
-  TYPE_PROJECT_MEMBER_CREATE = "TYPE_PROJECT_MEMBER_CREATE",
-  /** TYPE_PROJECT_MEMBER_DELETE - TYPE_PROJECT_MEMBER_DELETE represents removing a member from the project. */
-  TYPE_PROJECT_MEMBER_DELETE = "TYPE_PROJECT_MEMBER_DELETE",
-  /**
-   * TYPE_SQL_EDITOR_QUERY - SQL Editor related activity types.
-   * TYPE_SQL_EDITOR_QUERY represents executing query in SQL Editor.
-   */
-  TYPE_SQL_EDITOR_QUERY = "TYPE_SQL_EDITOR_QUERY",
   UNRECOGNIZED = "UNRECOGNIZED",
 }
 
@@ -485,45 +454,9 @@ export function activity_TypeFromJSON(object: any): Activity_Type {
     case 5:
     case "TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE":
       return Activity_Type.TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE;
-    case 6:
-    case "TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE":
-      return Activity_Type.TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE;
     case 22:
     case "TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE":
       return Activity_Type.TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE;
-    case 8:
-    case "TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE":
-      return Activity_Type.TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE;
-    case 9:
-    case "TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE":
-      return Activity_Type.TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE;
-    case 10:
-    case "TYPE_MEMBER_CREATE":
-      return Activity_Type.TYPE_MEMBER_CREATE;
-    case 11:
-    case "TYPE_MEMBER_ROLE_UPDATE":
-      return Activity_Type.TYPE_MEMBER_ROLE_UPDATE;
-    case 12:
-    case "TYPE_MEMBER_ACTIVATE":
-      return Activity_Type.TYPE_MEMBER_ACTIVATE;
-    case 13:
-    case "TYPE_MEMBER_DEACTIVATE":
-      return Activity_Type.TYPE_MEMBER_DEACTIVATE;
-    case 14:
-    case "TYPE_PROJECT_REPOSITORY_PUSH":
-      return Activity_Type.TYPE_PROJECT_REPOSITORY_PUSH;
-    case 15:
-    case "TYPE_PROJECT_DATABASE_TRANSFER":
-      return Activity_Type.TYPE_PROJECT_DATABASE_TRANSFER;
-    case 16:
-    case "TYPE_PROJECT_MEMBER_CREATE":
-      return Activity_Type.TYPE_PROJECT_MEMBER_CREATE;
-    case 17:
-    case "TYPE_PROJECT_MEMBER_DELETE":
-      return Activity_Type.TYPE_PROJECT_MEMBER_DELETE;
-    case 19:
-    case "TYPE_SQL_EDITOR_QUERY":
-      return Activity_Type.TYPE_SQL_EDITOR_QUERY;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -551,32 +484,8 @@ export function activity_TypeToJSON(object: Activity_Type): string {
       return "TYPE_ISSUE_APPROVAL_NOTIFY";
     case Activity_Type.TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE:
       return "TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE";
-    case Activity_Type.TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE:
-      return "TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE";
     case Activity_Type.TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE:
       return "TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE";
-    case Activity_Type.TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE:
-      return "TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE";
-    case Activity_Type.TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE:
-      return "TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE";
-    case Activity_Type.TYPE_MEMBER_CREATE:
-      return "TYPE_MEMBER_CREATE";
-    case Activity_Type.TYPE_MEMBER_ROLE_UPDATE:
-      return "TYPE_MEMBER_ROLE_UPDATE";
-    case Activity_Type.TYPE_MEMBER_ACTIVATE:
-      return "TYPE_MEMBER_ACTIVATE";
-    case Activity_Type.TYPE_MEMBER_DEACTIVATE:
-      return "TYPE_MEMBER_DEACTIVATE";
-    case Activity_Type.TYPE_PROJECT_REPOSITORY_PUSH:
-      return "TYPE_PROJECT_REPOSITORY_PUSH";
-    case Activity_Type.TYPE_PROJECT_DATABASE_TRANSFER:
-      return "TYPE_PROJECT_DATABASE_TRANSFER";
-    case Activity_Type.TYPE_PROJECT_MEMBER_CREATE:
-      return "TYPE_PROJECT_MEMBER_CREATE";
-    case Activity_Type.TYPE_PROJECT_MEMBER_DELETE:
-      return "TYPE_PROJECT_MEMBER_DELETE";
-    case Activity_Type.TYPE_SQL_EDITOR_QUERY:
-      return "TYPE_SQL_EDITOR_QUERY";
     case Activity_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -603,32 +512,8 @@ export function activity_TypeToNumber(object: Activity_Type): number {
       return 21;
     case Activity_Type.TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE:
       return 5;
-    case Activity_Type.TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE:
-      return 6;
     case Activity_Type.TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE:
       return 22;
-    case Activity_Type.TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE:
-      return 8;
-    case Activity_Type.TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE:
-      return 9;
-    case Activity_Type.TYPE_MEMBER_CREATE:
-      return 10;
-    case Activity_Type.TYPE_MEMBER_ROLE_UPDATE:
-      return 11;
-    case Activity_Type.TYPE_MEMBER_ACTIVATE:
-      return 12;
-    case Activity_Type.TYPE_MEMBER_DEACTIVATE:
-      return 13;
-    case Activity_Type.TYPE_PROJECT_REPOSITORY_PUSH:
-      return 14;
-    case Activity_Type.TYPE_PROJECT_DATABASE_TRANSFER:
-      return 15;
-    case Activity_Type.TYPE_PROJECT_MEMBER_CREATE:
-      return 16;
-    case Activity_Type.TYPE_PROJECT_MEMBER_DELETE:
-      return 17;
-    case Activity_Type.TYPE_SQL_EDITOR_QUERY:
-      return 19;
     case Activity_Type.UNRECOGNIZED:
     default:
       return -1;
@@ -1678,6 +1563,7 @@ function createBaseProject(): Project {
     allowSelfApproval: false,
     executionRetryPolicy: undefined,
     ciSamplingSize: 0,
+    parallelTasksPerRollout: 0,
   };
 }
 
@@ -1730,6 +1616,9 @@ export const Project: MessageFns<Project> = {
     }
     if (message.ciSamplingSize !== 0) {
       writer.uint32(184).int32(message.ciSamplingSize);
+    }
+    if (message.parallelTasksPerRollout !== 0) {
+      writer.uint32(192).int32(message.parallelTasksPerRollout);
     }
     return writer;
   },
@@ -1869,6 +1758,14 @@ export const Project: MessageFns<Project> = {
           message.ciSamplingSize = reader.int32();
           continue;
         }
+        case 24: {
+          if (tag !== 192) {
+            break;
+          }
+
+          message.parallelTasksPerRollout = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1906,6 +1803,9 @@ export const Project: MessageFns<Project> = {
         ? Project_ExecutionRetryPolicy.fromJSON(object.executionRetryPolicy)
         : undefined,
       ciSamplingSize: isSet(object.ciSamplingSize) ? globalThis.Number(object.ciSamplingSize) : 0,
+      parallelTasksPerRollout: isSet(object.parallelTasksPerRollout)
+        ? globalThis.Number(object.parallelTasksPerRollout)
+        : 0,
     };
   },
 
@@ -1959,6 +1859,9 @@ export const Project: MessageFns<Project> = {
     if (message.ciSamplingSize !== 0) {
       obj.ciSamplingSize = Math.round(message.ciSamplingSize);
     }
+    if (message.parallelTasksPerRollout !== 0) {
+      obj.parallelTasksPerRollout = Math.round(message.parallelTasksPerRollout);
+    }
     return obj;
   },
 
@@ -1985,6 +1888,7 @@ export const Project: MessageFns<Project> = {
       ? Project_ExecutionRetryPolicy.fromPartial(object.executionRetryPolicy)
       : undefined;
     message.ciSamplingSize = object.ciSamplingSize ?? 0;
+    message.parallelTasksPerRollout = object.parallelTasksPerRollout ?? 0;
     return message;
   },
 };

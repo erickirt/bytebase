@@ -1,19 +1,17 @@
 import { cloneDeep, groupBy, orderBy } from "lodash-es";
 import { v4 as uuidv4 } from "uuid";
 import { useRoute } from "vue-router";
-import type { TemplateType } from "@/plugins";
 import {
   useChangelistStore,
   useDatabaseV1Store,
   useEnvironmentV1Store,
   useProjectV1Store,
   useSheetV1Store,
-  useStorageStore,
   batchGetOrFetchDatabases,
 } from "@/store";
 import { projectNamePrefix } from "@/store/modules/v1/common";
 import { composePlan } from "@/store/modules/v1/plan";
-import type { ComposedProject } from "@/types";
+import type { ComposedProject, IssueType } from "@/types";
 import {
   Plan,
   Plan_ChangeDatabaseConfig,
@@ -30,6 +28,7 @@ import {
 } from "@/utils";
 import { databaseEngineForSpec, sheetNameForSpec } from "../plan";
 import { createEmptyLocalSheet, getLocalSheetByName } from "../sheet";
+import { extractInitialSQLFromQuery } from "./util";
 
 export type InitialSQL = {
   sqlMap?: Record<string, string>;
@@ -59,15 +58,12 @@ export const createPlanSkeleton = async (
     `${projectNamePrefix}${projectName}`
   );
   const databaseNameList = (query.databaseList ?? "").split(",");
-  await batchGetOrFetchDatabases(databaseNameList);
-
   const params: CreatePlanParams = {
     databaseNameList,
     project,
     query,
     initialSQL: await extractInitialSQLFromQuery(query),
   };
-
   const plan = await buildPlan(params);
   return plan;
 };
@@ -244,7 +240,7 @@ export const buildSpecForTarget = async (
   version?: string
 ) => {
   const sheet = `${project.name}/sheets/${sheetUID ?? nextUID()}`;
-  const template = query.template as TemplateType | undefined;
+  const template = query.template as IssueType | undefined;
   const spec = Plan_Spec.fromJSON({
     id: uuidv4(),
   });
@@ -323,32 +319,6 @@ const maybeSetInitialSQLForSpec = (
   }
 };
 
-const extractInitialSQLFromQuery = async (
-  query: Record<string, string>
-): Promise<InitialSQL> => {
-  const storageStore = useStorageStore();
-  const sql = query.sql;
-  if (sql && typeof sql === "string") {
-    return {
-      sql,
-    };
-  }
-  const sqlStorageKey = query.sqlStorageKey;
-  if (sqlStorageKey && typeof sqlStorageKey === "string") {
-    const sql = (await storageStore.get(sqlStorageKey)) || "";
-    return {
-      sql,
-    };
-  }
-  const sqlMapStorageKey = query.sqlMapStorageKey;
-  if (sqlMapStorageKey && typeof sqlMapStorageKey === "string") {
-    const sqlMap =
-      (await storageStore.get<Record<string, string>>(sqlMapStorageKey)) || {};
-    return { sqlMap };
-  }
-  return {};
-};
-
 const hasInitialSQL = (initialSQL?: InitialSQL) => {
   if (!initialSQL) {
     return false;
@@ -360,29 +330,4 @@ const hasInitialSQL = (initialSQL?: InitialSQL) => {
     return true;
   }
   return false;
-};
-
-export const isValidSpec = (spec: Plan_Spec): boolean => {
-  if (spec.changeDatabaseConfig) {
-    const sheetName = sheetNameForSpec(spec);
-    if (!sheetName) {
-      return false;
-    }
-    const uid = extractSheetUID(sheetName);
-    if (uid.startsWith("-")) {
-      const sheet = getLocalSheetByName(sheetName);
-      if (getSheetStatement(sheet).length === 0) {
-        return false;
-      }
-    } else {
-      const sheet = useSheetV1Store().getSheetByName(sheetName);
-      if (!sheet) {
-        return false;
-      }
-      if (getSheetStatement(sheet).length === 0) {
-        return false;
-      }
-    }
-  }
-  return true;
 };

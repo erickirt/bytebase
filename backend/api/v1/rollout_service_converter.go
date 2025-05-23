@@ -487,6 +487,9 @@ func convertToTaskRun(ctx context.Context, s *store.Store, stateCfg *state.State
 	if taskRun.StartedAt != nil {
 		t.StartTime = timestamppb.New(*taskRun.StartedAt)
 	}
+	if taskRun.RunAt != nil {
+		t.RunTime = timestamppb.New(*taskRun.RunAt)
+	}
 
 	if taskRun.SheetUID != nil && *taskRun.SheetUID != 0 {
 		sheet, err := s.GetSheet(ctx, &store.FindSheetMessage{UID: taskRun.SheetUID})
@@ -585,6 +588,12 @@ func convertToSchedulerInfoWaitingCause(ctx context.Context, s *store.Store, c *
 					Task:  common.FormatTask(pipeline.ProjectID, task.PipelineID, task.StageID, task.ID),
 					Issue: issueName,
 				},
+			},
+		}, nil
+	case *storepb.SchedulerInfo_WaitingCause_ParallelTasksLimit:
+		return &v1pb.TaskRun_SchedulerInfo_WaitingCause{
+			Cause: &v1pb.TaskRun_SchedulerInfo_WaitingCause_ParallelTasksLimit{
+				ParallelTasksLimit: cause.ParallelTasksLimit,
 			},
 		}, nil
 	default:

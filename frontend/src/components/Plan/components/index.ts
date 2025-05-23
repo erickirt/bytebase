@@ -9,7 +9,7 @@ export {
   HeaderSection,
   SpecListSection,
   PlanCheckSection,
+  SQLCheckSection,
   StatementSection,
   DescriptionSection,
-  SQLCheckSection,
 };
