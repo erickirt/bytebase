@@ -17,7 +17,7 @@ import { getUserEmailListInBinding } from "@/utils";
 import { convertFromExpr } from "@/utils/issue/cel";
 import { useCurrentUserV1 } from "../auth";
 import { useRoleStore } from "../role";
-import { batchGetOrFetchUsers } from "../user";
+import { useUserStore } from "../user";
 import { usePermissionStore } from "./permission";
 
 export const useProjectIamPolicyStore = defineStore(
@@ -31,7 +31,7 @@ export const useProjectIamPolicyStore = defineStore(
         list.push(...binding.members);
         return list;
       }, [] as string[]);
-      await batchGetOrFetchUsers(members);
+      await useUserStore().batchGetUsers(members);
     };
 
     const setIamPolicy = async (project: string, policy: IamPolicy) => {
@@ -94,7 +94,7 @@ export const useProjectIamPolicyStore = defineStore(
     };
 
     const getProjectIamPolicy = (project: string) => {
-      return policyMap.value.get(project) ?? IamPolicy.fromJSON({});
+      return policyMap.value.get(project) ?? IamPolicy.fromPartial({});
     };
 
     const getOrFetchProjectIamPolicy = async (project: string) => {
@@ -147,7 +147,7 @@ export const useProjectIamPolicy = (project: MaybeRef<string>) => {
     { immediate: true }
   );
   const policy = computed(() => {
-    return store.policyMap.get(unref(project)) ?? IamPolicy.fromJSON({});
+    return store.policyMap.get(unref(project)) ?? IamPolicy.fromPartial({});
   });
   return { policy, ready };
 };

@@ -183,7 +183,7 @@
     "expiration": "Expiration",
     "configure": "Configure",
     "groups": "Groups",
-    "database-groups": "Database Groups",
+    "database-group": "Database Group | Database Groups",
     "members": "Members",
     "warehouse": "Warehouse",
     "schedule": "Schedule",
@@ -224,10 +224,16 @@
     "catalog": "Catalog",
     "summary": "Summary",
     "errors": "Errors",
-    "removed": "Removed"
+    "removed": "Removed",
+    "options": "Options",
+    "submit": "Submit"
   },
   "error-page": {
     "go-back-home": "Go back home"
+  },
+  "refresh-remind": {
+    "title": "Outdated version detected",
+    "description": "Detect outdated version. Please refresh the page."
   },
   "task": {
     "current-task": "Current task",
@@ -246,9 +252,6 @@
       },
       "summary-report": "Summary report"
     },
-    "rollout-time": "Rollout time",
-    "earliest-allowed-time-hint": "@:{'task.rollout-time'} is when you want a task to run; if unspecified, it runs when all criteria are met.",
-    "earliest-allowed-time-unset": "Unset",
     "comment": "Comment",
     "started": "Started",
     "view-change": "View change",
@@ -270,13 +273,18 @@
     "action-all-tasks-in-current-stage": "{action} all tasks in current stage",
     "cancel-task": "Cancel task | Cancel tasks",
     "created": "Created",
+    "run-immediately": "Run task immediately | Run tasks immediately",
+    "scheduled-time": "Scheduled time",
+    "select-scheduled-time": "Select scheduled time",
+    "error": {
+      "scheduled-time-must-be-in-the-future": "Scheduled time must be in the future"
+    },
     "online-migration": {
       "self": "Online migration",
       "configure-ghost-parameters": "Configure gh-ost parameters",
       "ghost-parameters": "gh-ost parameters",
       "configure": "Configure",
       "error": {
-        "x-status-task-is-not-editable": "{status} task is not editable",
         "nothing-changed": "Nothing changed",
         "not-applicable": {
           "task-doesnt-meet-ghost-requirement": "Task doesn't meet gh-ost's requirement",
@@ -291,8 +299,9 @@
     "status": {
       "enqueued": "Waiting for execution.",
       "enqueued-with-rollout-time": "Waiting to execute after {time}.",
-      "waiting-connection": "Waiting for available instance connections. The instance connection count has reached the limit set on Bytebase.",
-      "waiting-task": "Waiting for another task to finish."
+      "waiting-connection": "Waiting for available instance connections. The instance connection count has reached the limit set on Bytebase. Last report at {time}.",
+      "waiting-task": "Waiting for another task to finish. Last report at {time}.",
+      "waiting-max-tasks-per-rollout": "Waiting for other tasks to finish. Maximum running tasks limit per rollout has been reached. Last report at {time}."
     }
   },
   "banner": {
@@ -306,11 +315,6 @@
     "external-url": "Bytebase has not configured --external-url"
   },
   "bbkit": {
-    "common": {
-      "cancel": "Cancel",
-      "back": "Back",
-      "next": "Next"
-    },
     "confirm-button": {
       "sure-to-delete": "Are you sure to delete?",
       "sure-to-archive": "Are you sure to archive?",
@@ -352,7 +356,8 @@
       "subscription": "(Upgrade to enable role management)"
     },
     "members": {
-      "inactive": "Inactive members",
+      "inactive": "Inactive",
+      "inactive-users": "Inactive users",
       "table": {
         "account": "Account",
         "role": "Role",
@@ -387,7 +392,7 @@
       "reset-service-key": "Reset Service Key",
       "reset-service-key-alert": "This action cannot be undone. The old key will stop working immediately. Are you sure you want to reset this service key?",
       "service-key-copied": "Service Key copied to clipboard, please keep it in secret.",
-      "show-inactive": "Show inactive members",
+      "show-inactive": "Show inactive users",
       "view-by-roles": "View by roles",
       "add-member": "Add member",
       "add-user": "Add user",
@@ -401,11 +406,13 @@
         "reset-token": "Reset token",
         "reset-token-warning": "You need to update the Entra application provisioning config."
       },
+      "all-users": "All users",
       "search-member": "Search member",
       "revoked": "Revoked",
       "view-by-members": "View by members",
       "revoke-access": "Revoke Access",
       "revoke-access-alert": "Are you sure to revoke access?",
+      "revoke-allusers-alert": "Revoke \"@:{'settings.members.all-users'}\" will revoke related roles from all other users in your workspace. Are you sure to continue?",
       "grant-access": "Grant Access",
       "select-user": "Select user | Select users",
       "select-group": "Select group | Select groups",
@@ -508,7 +515,7 @@
         },
         "maximum-role-expiration": {
           "self": "Maximum role expiration",
-          "description": "Maximum role expiration is the maximum period a role can be granted to a user. (Only for querier and exporter roles)",
+          "description": "Maximum role expiration is the maximum period a role can be granted to a user, will apply on all project roles expect the project owner.",
           "days": "Day(s)",
           "never-expires": "Never expires"
         },
@@ -890,6 +897,7 @@
     "issue-name": "Issue name",
     "grant-request": {
       "export-rows": "Max export rows",
+      "select-export-rows": "Select maximum export rows",
       "expired-at": "Expired at",
       "all-databases": "All",
       "all-databases-tip": "All current and future databases in this project.",
@@ -908,17 +916,9 @@
       "current-change-will-apply-to-all-tasks-in-batch-mode": "In batch mode, current change will be applied to all tasks.",
       "current-change-will-apply-to-all-tasks": "Current change will be applied to all tasks."
     },
-    "not-editable-legacy-issue": "This issue is not editable because it was created in an old version of Bytebase",
     "action-anyway": "{action} anyway",
-    "disallow-edit-reasons": {
-      "issue-is-done": "The issue is done",
-      "issue-is-canceled": "The issue is canceled",
-      "task-is-x-status": "The task is {status}",
-      "task-is-running-cancel-first": "The task is running, cancel task before changing this value"
-    },
-    "you-are-not-allowed-to-change-this-value": "You are not allowed to change this value",
     "sql-check": {
-      "sql-checks": "SQL Checks",
+      "sql-checks": "SQL checks",
       "not-executed-yet": "Not executed yet",
       "statement-is-required": "SQL statement is required",
       "statement-is-too-large": "As the current statement size exceeds 2MB, the SQL check will be skipped.",
@@ -940,9 +940,6 @@
       "format": "Format",
       "encrypt": "Encrypt",
       "file-downloaded": "File Downloaded"
-    },
-    "update-rollout-time": {
-      "self": "Update rollout time"
     },
     "task-run": {
       "logs": "Logs",
@@ -985,8 +982,8 @@
       "change-data": "Change data",
       "export-data": "Export data",
       "create-database": "Create database",
-      "request-querier-role": "Request querier role",
-      "request-exporter-role": "Request exporter role"
+      "request-role": "Request role",
+      "request-specific-role": "Request \"{role}\" role"
     },
     "schema-drift-detected": {
       "self": "Schema drift detected",
@@ -1263,9 +1260,9 @@
       "title": "Access Control",
       "disable-copy-data-from-sql-editor": "Restrict data copying in SQL Editor (Admins/DBAs allowed)",
       "restrict-admin-connection": {
-        "self": "Admin connection query restrictions",
-        "disallow": "Disallow querying data from the admin connection",
-        "fallback": "Fallback to the admin connection if no read-only connection is available"
+        "self": "Restrict querying admin data sources",
+        "disallow": "Disallow querying data from the admin data source",
+        "fallback": "Allow querying the admin data source if no read-only connection is available"
       }
     },
     "statement-execution": {
@@ -1328,7 +1325,7 @@
     "rollout": {
       "name": "Rollout Policy",
       "tip": "The policy is applied to issues retroactively.",
-      "info": "Tasks can be executed by users with 'taskRuns.create' permission or the following roles",
+      "info": "Tasks can be executed by users with '{permission}' permission or the following roles",
       "auto": "Automatic",
       "auto-info": "If all check pass, the change will be rolled out and executed automatically.",
       "last-issue-approver": "Last Issue Approver"
@@ -1383,7 +1380,6 @@
     "successfully-transferred-databases": "Successfully transferred databases",
     "nullable": "Nullable",
     "expression": "Expression",
-    "position": "Position",
     "unique": "Unique",
     "visible": "Visible",
     "comment": "Comment",
@@ -1484,6 +1480,7 @@
     "foreign-key": {
       "reference": "Reference"
     },
+    "checks": "Checks",
     "create-target-database-or-schema-for-backup": "Please create the target database or schema for the backup first",
     "revision": {
       "self": "Revision",
@@ -1644,6 +1641,10 @@
         "ci-sampling-size": {
           "self": "CI Data Sampling Size",
           "description": "The maximum number of databases to sample during CI data validation. When disabled (zero), full validation will be performed."
+        },
+        "parallel_tasks_per_rollout": {
+          "self": "Parallel tasks per rollout",
+          "description": "Control the number of parallel tasks per rollout. Setting this to zero disables any throttling."
         }
       }
     },
@@ -1719,7 +1720,6 @@
   "sql-editor": {
     "self": "SQL Editor",
     "select-connection": "Please select connections",
-    "search-databases": "Search Databases",
     "search-results": "Search Results",
     "loading-databases": "Loading Databases...",
     "show-databases-without-query-permission": "Show databases without query permissions",
@@ -1733,6 +1733,10 @@
     "to-enable-admin-mode": "to enable the admin mode",
     "notify-empty-statement": "Please input your SQL statements in the editor",
     "can-not-execute-query": "Cannot execute query when loading data.",
+    "invalid-database": "Invalid database {database}",
+    "request-cancelled": "Request cancelled",
+    "request-aborted": "User aborted the request",
+    "no-data-source": "No queriable data source. Please check the data source query policy on environment or project.",
     "rows": "row | rows",
     "vertical-display": "Vertical display",
     "no-history-found": "No history found",
@@ -1797,10 +1801,19 @@
     },
     "batch-query": {
       "batch": "Batch",
-      "select-database": "Select database below",
-      "description": "Batch query {count} additional databases under {project}.",
-      "show-or-hide-empty-query-results": "Show / hide empty query results"
+      "select-database-group": "You can {select-database-group} to batch query",
+      "description": "Batch query {database} additional databases and {group} database groups under {project}.",
+      "show-or-hide-empty-query-results": "Show / hide empty query results",
+      "select-data-source": {
+        "self": "Select data source for batch",
+        "tooltip": "Will find available data sources with restriction policy, then apply the selection.",
+        "admin": "Admin",
+        "readonly": "Read-only",
+        "not-match": "Data source not match, expect {expect} but got {actual}."
+      }
     },
+    "execute-query": "Execute query",
+    "pending-query": "Pending query",
     "executing-query": "Executing query",
     "request-query": "Request query",
     "copy-success": "Copy success",
@@ -1978,13 +1991,6 @@
     "button": {
       "upgrade": "Upgrade"
     },
-    "trial-start-modal": {
-      "title": "Start your {plan} trial",
-      "content": "Your {plan} trial has started! You can access {plan} features before {date}.",
-      "button": "Got it",
-      "subscription-page": "subscription page",
-      "subscription": "Go to the {page} to learn these features and our plans."
-    },
     "description": "You can upload your Bytebase license to unlock pro/enterprise features.",
     "upload-license": "Upload license",
     "upgrade-trial-button": "Upgrade trial",
@@ -2006,8 +2012,7 @@
       "manage-license": "Manage Instance License",
       "used-and-total-license": "Assigned / Total Instance License",
       "used-and-total-user": "Active / Total User Limit",
-      "success-notification": "Successfully update license assignment",
-      "missing-license-for-feature": "Missing instance license to enable {feature}. Click to assign now."
+      "success-notification": "Successfully update license assignment"
     },
     "update": {
       "success": {
@@ -2140,13 +2145,6 @@
     "self": "Sensitive Data"
   },
   "resource": {
-    "environment": "Environment",
-    "instance": "Instance",
-    "project": "Project",
-    "idp": "Identity Provider",
-    "database-group": "Database Group",
-    "changelist": "Changelist",
-    "review-config": "Review Config",
     "delete-warning": "The \"{name}\" will be deleted. This action cannot be undone.",
     "delete-warning-with-resources": "The \"{name}\" is used by following resources:",
     "delete-warning-retry": "Please remove it from these resources then retry again."
@@ -2159,7 +2157,8 @@
       "duplicated": "The {resource} ID already exists. Please choose another one.",
       "pattern": "The {resource} ID can have lowercase letters, digits, or hyphens. It must start with a lowercase letter and end with a letter or number.",
       "minlength": "The {resource} ID is too short. It should have at least 1 character.",
-      "overflow": "The {resource} ID is too long. It should have less than 64 characters."
+      "overflow": "The {resource} ID is too long. It should have less than 64 characters.",
+      "empty": "The {resource} ID cannot be empty"
     }
   },
   "multi-factor": {
@@ -2278,8 +2277,7 @@
           "ddl": "DDL",
           "create_database": "Create Database",
           "data_export": "Export Data",
-          "request_query": "Request Querier Role",
-          "request_export": "Request Exporter Role"
+          "request-role": "Request Role"
         }
       },
       "template": {
@@ -2403,7 +2401,6 @@
       "title-placeholder": "Input role title",
       "description-placeholder": "Input role description"
     },
-    "default-workspace-role": "Users will get the \"Workspace Member\" role by default",
     "title": "Title",
     "select-role": "Select role",
     "expired-tip": "The role might has been expired.",
@@ -2545,15 +2542,8 @@
     "files": "Files",
     "create": "Create release",
     "select": "Select release",
-    "tasks-to-apply": "Tasks to apply",
-    "out-of-order-files": "Out of order files",
-    "applied-but-modifed-files": "Applied but modified files",
-    "allow-out-of-order": "Allow out of order",
     "archive-this-release": "Archive this release",
     "total-files": "Total {count} files",
-    "no-tasks-to-apply": {
-      "self": "No tasks to apply"
-    },
     "actions": {
       "new-file": "New file",
       "import-from-release": "Import from release"
@@ -2561,8 +2551,7 @@
     "messages": {
       "succeed-to-create-release": "Succeed to create release",
       "files-will-always-be-sorted-and-executed-in-version-order": "The files will always be sorted and executed in version order.",
-      "cannot-modify-files-after-created": "You cannot modify files after the release is created.",
-      "bytebase-will-skip-those-files-has-been-applied-on-target-database": "Bytebase will automatically skip those files that have already been executed on the target database."
+      "cannot-modify-files-after-created": "You cannot modify files after the release is created."
     },
     "usage-description": "The release is only used in custom GitOps with API integration."
   },
@@ -2590,7 +2579,24 @@
     "self": "Worksheet"
   },
   "setup": {
-    "self": "Setup"
+    "self": "Setup",
+    "basic-info": "Basic info",
+    "skip-setup": "Skip setup",
+    "purposes": {
+      "self": "What's your main purpose with Bytebase?",
+      "alter-schema": "Alter schema",
+      "query-data": "Query data"
+    },
+    "workflow": {
+      "self": "What's your workflow with database?",
+      "team": "Work with teammates, need CI/CD pipeline",
+      "simple": "No complex workflow, just need UI tools"
+    },
+    "data": {
+      "self-setup": "Setup the project",
+      "built-in": "Use built-in sample",
+      "built-in-desc": "Generate sample project and instances"
+    }
   },
   "landing": {
     "quick-link": {

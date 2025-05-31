@@ -1,17 +1,12 @@
+import { planCheckRunSummaryForCheckRunList } from "@/components/PlanCheckRun/common";
+import type { CheckReleaseResponse_CheckResult } from "@/types/proto/v1/release_service";
 import type { Task, Task_Status } from "@/types/proto/v1/rollout_service";
 import { Advice_Status } from "@/types/proto/v1/sql_service";
 import { type IssueContext } from "../../logic";
-import { type SQLCheckContext } from "../SQLCheckSection/context";
-
-export interface TaskFilter {
-  // Only for created tasks.
-  status: Task_Status[];
-  adviceStatus: Advice_Status[];
-}
 
 export const filterTask = (
   issueContext: IssueContext,
-  sqlCheckContext: SQLCheckContext,
+  sqlCheckResultMap: Record<string, CheckReleaseResponse_CheckResult>,
   task: Task,
   {
     status,
@@ -27,27 +22,28 @@ export const filterTask = (
   }
   if (adviceStatus) {
     if (isCreating.value) {
-      const { enabled, resultMap } = sqlCheckContext;
-      if (enabled.value) {
-        const result = resultMap.value[task.target];
-        if (adviceStatus === Advice_Status.UNRECOGNIZED) {
-          return !Boolean(result);
-        }
-        if (adviceStatus === Advice_Status.SUCCESS) {
-          return result && result.advices.length === 0;
-        }
-        return (
-          result &&
-          result.advices.some((advice) => advice.status === adviceStatus)
-        );
+      const result = sqlCheckResultMap[task.target];
+      if (adviceStatus === Advice_Status.UNRECOGNIZED) {
+        return !Boolean(result);
       }
-    } else {
-      const planCheckRuns = getPlanCheckRunsForTask(task);
-      return planCheckRuns.some((run) =>
-        run.results.some(
-          (result) => result.status.toString() === adviceStatus.toString()
-        )
+      if (adviceStatus === Advice_Status.SUCCESS) {
+        return result && result.advices.length === 0;
+      }
+      return (
+        result &&
+        result.advices.some((advice) => advice.status === adviceStatus)
       );
+    } else {
+      const summary = planCheckRunSummaryForCheckRunList(
+        getPlanCheckRunsForTask(task)
+      );
+      if (summary.errorCount > 0) {
+        return adviceStatus === Advice_Status.ERROR;
+      } else if (summary.warnCount > 0) {
+        return adviceStatus === Advice_Status.WARNING;
+      } else {
+        return adviceStatus === Advice_Status.SUCCESS;
+      }
     }
   }
 

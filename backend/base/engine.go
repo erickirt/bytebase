@@ -98,7 +98,8 @@ func EngineSupportMasking(e storepb.Engine) bool {
 		storepb.Engine_OCEANBASE,
 		storepb.Engine_TIDB,
 		storepb.Engine_BIGQUERY,
-		storepb.Engine_SPANNER:
+		storepb.Engine_SPANNER,
+		storepb.Engine_TRINO:
 		return true
 	case
 		storepb.Engine_ENGINE_UNSPECIFIED,
@@ -119,8 +120,7 @@ func EngineSupportMasking(e storepb.Engine) bool {
 		storepb.Engine_DYNAMODB,
 		storepb.Engine_ELASTICSEARCH,
 		storepb.Engine_DATABRICKS,
-		storepb.Engine_COSMOSDB,
-		storepb.Engine_TRINO:
+		storepb.Engine_COSMOSDB:
 		return false
 	default:
 		return false
@@ -147,7 +147,8 @@ func EngineSupportAutoComplete(e storepb.Engine) bool {
 		storepb.Engine_DM,
 		storepb.Engine_OCEANBASE_ORACLE,
 		storepb.Engine_SNOWFLAKE,
-		storepb.Engine_DYNAMODB:
+		storepb.Engine_DYNAMODB,
+		storepb.Engine_TRINO:
 		return true
 	case
 		storepb.Engine_ENGINE_UNSPECIFIED,
@@ -160,8 +161,7 @@ func EngineSupportAutoComplete(e storepb.Engine) bool {
 		storepb.Engine_HIVE,
 		storepb.Engine_ELASTICSEARCH,
 		storepb.Engine_DATABRICKS,
-		storepb.Engine_COSMOSDB,
-		storepb.Engine_TRINO:
+		storepb.Engine_COSMOSDB:
 		return false
 	default:
 		return false
@@ -220,6 +220,7 @@ func EngineSupportStatementReport(e storepb.Engine) bool {
 		storepb.Engine_ORACLE,
 		storepb.Engine_OCEANBASE_ORACLE,
 		storepb.Engine_MSSQL,
+		storepb.Engine_MARIADB,
 		storepb.Engine_REDSHIFT:
 		return true
 	case
@@ -233,7 +234,6 @@ func EngineSupportStatementReport(e storepb.Engine) bool {
 		storepb.Engine_CLICKHOUSE,
 		storepb.Engine_SPANNER,
 		storepb.Engine_BIGQUERY,
-		storepb.Engine_MARIADB,
 		storepb.Engine_STARROCKS,
 		storepb.Engine_RISINGWAVE,
 		storepb.Engine_HIVE,
@@ -326,6 +326,47 @@ func EngineSupportCreateDatabase(e storepb.Engine) bool {
 		storepb.Engine_DATABRICKS,
 		storepb.Engine_COSMOSDB,
 		storepb.Engine_TRINO:
+		return false
+	default:
+		return false
+	}
+}
+
+func EngineSupportQuerySpanPlainField(e storepb.Engine) bool {
+	//exhaustive:enforce
+	switch e {
+	case
+		storepb.Engine_MYSQL,
+		storepb.Engine_OCEANBASE,
+		storepb.Engine_MARIADB:
+		return true
+	case
+		storepb.Engine_ENGINE_UNSPECIFIED,
+		storepb.Engine_CASSANDRA,
+		storepb.Engine_SPANNER,
+		storepb.Engine_BIGQUERY,
+		storepb.Engine_DYNAMODB,
+		storepb.Engine_REDIS,
+		storepb.Engine_ORACLE,
+		storepb.Engine_DM,
+		storepb.Engine_OCEANBASE_ORACLE,
+		storepb.Engine_ELASTICSEARCH,
+		storepb.Engine_DATABRICKS,
+		storepb.Engine_COSMOSDB,
+		storepb.Engine_TRINO,
+		storepb.Engine_SQLITE,
+		storepb.Engine_POSTGRES,
+		storepb.Engine_MSSQL,
+		storepb.Engine_SNOWFLAKE,
+		storepb.Engine_CLICKHOUSE,
+		storepb.Engine_MONGODB,
+		storepb.Engine_TIDB,
+		storepb.Engine_REDSHIFT,
+		storepb.Engine_STARROCKS,
+		storepb.Engine_RISINGWAVE,
+		storepb.Engine_HIVE,
+		storepb.Engine_COCKROACHDB,
+		storepb.Engine_DORIS:
 		return false
 	default:
 		return false

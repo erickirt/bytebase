@@ -12,6 +12,7 @@
             ExportFormat.XLSX,
           ]"
           :tooltip="disableExportTip"
+          :view-mode="'DROPDOWN'"
           :disabled="!hasAuditLogFeature || !!disableExportTip"
           @export="handleExport"
         />
@@ -55,8 +56,8 @@ import PagedTable from "@/components/v2/Model/PagedTable.vue";
 import {
   featureToRef,
   useAuditLogStore,
-  batchGetOrFetchUsers,
   pushNotification,
+  useUserStore,
 } from "@/store";
 import { type SearchAuditLogsParams } from "@/types";
 import type { AuditLog } from "@/types/proto/v1/audit_log_service";
@@ -76,9 +77,17 @@ const readonlyScopes = computed((): SearchScope[] => {
 });
 
 const defaultSearchParams = () => {
+  const to = dayjs().endOf("day");
+  const from = to.add(-30, "day");
   const params: SearchParams = {
     query: "",
-    scopes: [...readonlyScopes.value],
+    scopes: [
+      ...readonlyScopes.value,
+      {
+        id: "created",
+        value: `${from.valueOf()},${to.valueOf()}`,
+      },
+    ],
   };
   return params;
 };
@@ -116,7 +125,7 @@ const fetchAuditLog = async ({
     pageToken,
     pageSize,
   });
-  await batchGetOrFetchUsers(auditLogs.map((log) => log.user));
+  await useUserStore().batchGetUsers(auditLogs.map((log) => log.user));
   return { nextPageToken, list: auditLogs };
 };
 

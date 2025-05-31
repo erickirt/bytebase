@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="queriedDatabaseNames.length > 1"
-    class="w-full flex flex-row justify-start items-center p-2 pb-0 gap-2 shrink-0 overflow-x-auto hide-scrollbar"
+    class="w-full flex flex-row justify-start items-center p-2 pb-0 gap-2 shrink-0"
   >
     <NTooltip v-if="showEmptySwitch">
       <template #trigger>
@@ -9,7 +9,7 @@
           tertiary
           size="small"
           :type="showEmpty ? 'primary' : 'default'"
-          style="--n-padding: 6px"
+          style="--n-padding: 6px; margin-bottom: 0.5rem"
           @click="showEmpty = !showEmpty"
         >
           <EyeIcon v-if="showEmpty" class="w-4 h-4" />
@@ -21,30 +21,25 @@
       </template>
     </NTooltip>
 
-    <NTooltip
-      v-for="item in filteredItems"
-      :key="item.database.name"
-      trigger="hover"
-    >
-      <template #trigger>
+    <NScrollbar x-scrollable class="pb-2">
+      <div class="flex flex-row justify-start items-center gap-2">
         <NButton
+          v-for="item in filteredItems"
+          :key="item.database.name"
           secondary
           strong
           size="small"
-          :type="selectedDatabase === item.database ? 'primary' : 'default'"
+          :type="'default'"
+          :style="{
+            ...getBackgroundColorRgb(item.database),
+            borderTop: selectedDatabase === item.database ? '3px solid' : '',
+          }"
           @click="$emit('update:selected-database', item.database)"
         >
-          <InstanceV1EngineIcon
-            :instance="item.database.instanceResource"
-            :tooltip="false"
-          />
-          <span class="mx-2 opacity-60">{{
-            item.database.effectiveEnvironmentEntity.title
-          }}</span>
-          <span>{{ item.database.databaseName }}</span>
-          <InfoIcon
-            v-if="isDatabaseQueryFailed(item.database)"
-            class="ml-1 text-yellow-600 w-4 h-auto"
+          <RichDatabaseName :database="item.database" />
+          <CircleAlertIcon
+            v-if="isDatabaseQueryFailed(item)"
+            class="ml-1 text-red-600 w-4 h-auto"
           />
           <span
             v-if="isEmptyQueryItem(item)"
@@ -57,26 +52,26 @@
             @click.stop="handleCloseSingleResultView(item.database)"
           />
         </NButton>
-      </template>
-      {{ item.database.instanceResource.title }}
-    </NTooltip>
+      </div>
+    </NScrollbar>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useLocalStorage } from "@vueuse/core";
 import { head } from "lodash-es";
-import { EyeIcon, EyeOffIcon, InfoIcon, XIcon } from "lucide-vue-next";
-import { NButton, NTooltip } from "naive-ui";
+import { EyeIcon, EyeOffIcon, CircleAlertIcon, XIcon } from "lucide-vue-next";
+import { NButton, NTooltip, NScrollbar } from "naive-ui";
 import { storeToRefs } from "pinia";
 import { computed, watch } from "vue";
-import { InstanceV1EngineIcon } from "@/components/v2";
+import { RichDatabaseName } from "@/components/v2";
 import { useDatabaseV1Store, useSQLEditorTabStore } from "@/store";
-import type { ComposedDatabase, SQLResultSetV1 } from "@/types";
+import type { ComposedDatabase, SQLEditorDatabaseQueryContext } from "@/types";
+import { hexToRgb } from "@/utils";
 
 type BatchQueryItem = {
   database: ComposedDatabase;
-  resultSet: SQLResultSetV1 | undefined;
+  context: SQLEditorDatabaseQueryContext | undefined;
 };
 
 const props = defineProps<{
@@ -96,27 +91,32 @@ const showEmpty = useLocalStorage(
 );
 
 const queriedDatabaseNames = computed(() =>
-  Array.from(tab.value?.queryContext?.results.keys() || [])
+  Array.from(tab.value?.databaseQueryContexts?.keys() || [])
 );
 
 const items = computed(() => {
   return queriedDatabaseNames.value.map<BatchQueryItem>((name) => {
     const database = databaseStore.getDatabaseByName(name);
-    const resultSet = tab.value?.queryContext?.results.get(name);
-    return { database, resultSet };
+    const context = head(tab.value?.databaseQueryContexts?.get(name));
+    return { database, context };
   });
 });
 
 const isEmptyQueryItem = (item: BatchQueryItem) => {
-  if (!item.resultSet) {
+  if (!item.context) {
     return true;
   }
-  if (item.resultSet.error) {
+  if (item.context.resultSet?.error) {
     // Failed queries have empty result sets, but should not be recognized
     // as empty result sets.
     return false;
   }
-  return item.resultSet.results.every((result) => result.rows.length === 0);
+  if (item.context.status !== "DONE") {
+    return false;
+  }
+  return item.context.resultSet?.results.every(
+    (result) => result.rows.length === 0
+  );
 };
 
 const filteredItems = computed(() => {
@@ -134,14 +134,23 @@ const showEmptySwitch = computed(() => {
   return items.value.some((item) => isEmptyQueryItem(item));
 });
 
-const isDatabaseQueryFailed = (database: ComposedDatabase) => {
-  const resultSet = tab.value?.queryContext?.results.get(database.name || "");
+const isDatabaseQueryFailed = (item: BatchQueryItem) => {
   // If there is any error in the result set, we consider the query failed.
-  return resultSet?.error || resultSet?.results.find((result) => result.error);
+  return (
+    item.context?.resultSet?.error ||
+    item.context?.resultSet?.results.find((result) => result.error)
+  );
 };
 
 const handleCloseSingleResultView = (database: ComposedDatabase) => {
-  tab.value?.queryContext?.results.delete(database.name || "");
+  const contexts = tab.value?.databaseQueryContexts?.get(database.name);
+  if (!contexts) {
+    return;
+  }
+  for (const context of contexts) {
+    context.abortController?.abort();
+  }
+  tab.value?.databaseQueryContexts?.delete(database.name);
 };
 
 // Auto select a proper database when the databases are ready.
@@ -157,4 +166,16 @@ watch(
     immediate: true,
   }
 );
+
+const getBackgroundColorRgb = (database: ComposedDatabase) => {
+  const color = hexToRgb(
+    database.effectiveEnvironmentEntity.color || "#4f46e5"
+  ).join(", ");
+  return {
+    backgroundColor: `rgba(${color}, 0.1)`,
+    borderTopColor: `rgb(${color})`,
+    color: `rgb(${color})`,
+    borderTop: "3px solid",
+  };
+};
 </script>

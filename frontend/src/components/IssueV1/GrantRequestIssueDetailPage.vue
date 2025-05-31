@@ -2,6 +2,7 @@
   <div ref="containerRef" class="h-full flex flex-col">
     <div class="border-b">
       <BannerSection v-if="!isCreating" />
+      <FeatureAttention feature="bb.feature.custom-approval" />
       <HeaderSection />
     </div>
 
@@ -9,13 +10,63 @@
       <div
         class="flex-1 flex flex-col hide-scrollbar divide-y overflow-x-hidden py-2"
       >
-        <div class="w-full px-4">
-          <GrantRequestExporterForm
-            v-if="requestRole === PresetRoleType.PROJECT_EXPORTER"
-          />
-          <GrantRequestQuerierForm
-            v-if="requestRole === PresetRoleType.SQL_EDITOR_USER"
-          />
+        <div
+          class="w-full mx-auto flex flex-col justify-start items-start px-4 mb-4 space-y-4"
+        >
+          <div
+            v-if="requestRole"
+            class="w-full flex flex-col justify-start items-start"
+          >
+            <span class="flex items-center textinfolabel mb-2">
+              {{ $t("role.self") }}
+            </span>
+            <div class="flex flex-row justify-start items-start">
+              {{ displayRoleTitle(requestRole) }}
+            </div>
+          </div>
+          <div
+            v-if="condition?.databaseResources"
+            class="w-full flex flex-col justify-start items-start"
+          >
+            <span class="flex items-center textinfolabel mb-2">
+              {{ $t("common.database") }}
+            </span>
+            <div
+              class="w-full flex flex-row justify-start items-start flex-wrap gap-2 gap-x-4"
+            >
+              <span v-if="condition.databaseResources.length === 0">{{
+                $t("issue.grant-request.all-databases")
+              }}</span>
+              <DatabaseResourceTable
+                v-else
+                class="w-full"
+                :database-resource-list="condition.databaseResources"
+              />
+            </div>
+          </div>
+          <div
+            v-if="condition?.rowLimit"
+            class="w-full flex flex-col justify-start items-start"
+          >
+            <span class="flex items-center textinfolabel mb-2">
+              {{ $t("issue.grant-request.export-rows") }}
+            </span>
+            <div class="flex flex-row justify-start items-start">
+              {{ condition?.rowLimit }}
+            </div>
+          </div>
+          <div class="w-full flex flex-col justify-start items-start">
+            <span class="flex items-center textinfolabel mb-2">
+              {{ $t("issue.grant-request.expired-at") }}
+            </span>
+            <div>
+              {{
+                condition?.expiredTime
+                  ? dayjs(new Date(condition.expiredTime)).format("LLL")
+                  : "-"
+              }}
+            </div>
+          </div>
         </div>
 
         <DescriptionSection />
@@ -62,9 +113,13 @@
 </template>
 
 <script setup lang="ts">
+import { computedAsync } from "@vueuse/core";
 import { computed, ref } from "vue";
+import { FeatureAttention } from "@/components/FeatureGuard";
 import { useEmitteryEventListener } from "@/composables/useEmitteryEventListener";
-import { PresetRoleType } from "@/types";
+import { displayRoleTitle } from "@/utils";
+import { convertFromCELString } from "@/utils/issue/cel";
+import { provideSidebarContext } from "../Plan/logic";
 import { Drawer } from "../v2";
 import {
   BannerSection,
@@ -73,16 +128,11 @@ import {
   IssueCommentSection,
   IssueReviewActionPanel,
   IssueStatusActionPanel,
-  GrantRequestExporterForm,
-  GrantRequestQuerierForm,
+  DatabaseResourceTable,
   Sidebar,
 } from "./components";
 import type { IssueReviewAction, IssueStatusAction } from "./logic";
-import {
-  provideIssueSidebarContext,
-  useIssueContext,
-  usePollIssue,
-} from "./logic";
+import { useIssueContext, usePollIssue } from "./logic";
 
 const containerRef = ref<HTMLElement>();
 const { isCreating, issue, events } = useIssueContext();
@@ -96,6 +146,13 @@ const ongoingIssueStatusAction = ref<{
 
 const requestRole = computed(() => {
   return issue.value.grantRequest?.role;
+});
+
+const condition = computedAsync(async () => {
+  const conditionExpression = await convertFromCELString(
+    issue.value.grantRequest?.condition?.expression ?? ""
+  );
+  return conditionExpression;
 });
 
 usePollIssue();
@@ -124,5 +181,5 @@ const {
   mode: sidebarMode,
   desktopSidebarWidth,
   mobileSidebarOpen,
-} = provideIssueSidebarContext(containerRef);
+} = provideSidebarContext(containerRef);
 </script>

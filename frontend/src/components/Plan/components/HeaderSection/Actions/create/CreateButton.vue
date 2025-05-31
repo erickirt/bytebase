@@ -41,18 +41,17 @@ import {
   isValidSpec,
 } from "@/components/Plan/logic";
 import { usePlanContext } from "@/components/Plan/logic";
-import { useSQLCheckContext } from "@/components/SQLCheck";
 import { planServiceClient } from "@/grpcweb";
 import { PROJECT_V1_ROUTE_REVIEW_CENTER_DETAIL } from "@/router/dashboard/projectV1";
-import { useDatabaseV1Store, useSheetV1Store } from "@/store";
+import { useCurrentProjectV1, useSheetV1Store } from "@/store";
 import { dialectOfEngineV1, languageOfEngineV1 } from "@/types";
+import type { Engine } from "@/types/proto/v1/common";
 import { type Plan_ChangeDatabaseConfig } from "@/types/proto/v1/plan_service";
 import type { Sheet } from "@/types/proto/v1/sheet_service";
 import type { ComposedPlan } from "@/types/v1/issue/plan";
 import {
   extractProjectResourceName,
   extractSheetUID,
-  flattenSpecList,
   getSheetStatement,
   hasProjectPermissionV2,
   planV1Slug,
@@ -63,20 +62,20 @@ const MAX_FORMATTABLE_STATEMENT_SIZE = 10000; // 10K characters
 
 const { t } = useI18n();
 const router = useRouter();
+const { project } = useCurrentProjectV1();
 const { plan, formatOnSave } = usePlanContext();
-const { runSQLCheck } = useSQLCheckContext();
 const sheetStore = useSheetV1Store();
 const loading = ref(false);
 
 const planCreateErrorList = computed(() => {
   const errorList: string[] = [];
-  if (!hasProjectPermissionV2(plan.value.projectEntity, "bb.plans.create")) {
+  if (!hasProjectPermissionV2(project.value, "bb.plans.create")) {
     errorList.push(t("common.missing-required-permission"));
   }
   if (!plan.value.title.trim()) {
     errorList.push("Missing plan title");
   }
-  if (!flattenSpecList(plan.value).every((spec) => isValidSpec(spec))) {
+  if (!(plan.value?.specs || []).every((spec) => isValidSpec(spec))) {
     errorList.push("Missing SQL statement in some tasks");
   }
 
@@ -85,11 +84,6 @@ const planCreateErrorList = computed(() => {
 
 const doCreatePlan = async () => {
   loading.value = true;
-  const check = runSQLCheck.value;
-  if (check && !(await check())) {
-    loading.value = false;
-    return;
-  }
 
   try {
     await createSheets();
@@ -122,12 +116,12 @@ const doCreatePlan = async () => {
 
 // Create sheets for spec configs and update their resource names.
 const createSheets = async () => {
-  const flattenSpecList = plan.value.steps.flatMap((step) => step.specs);
+  const specs = plan.value.specs || [];
   const configWithSheetList: Plan_ChangeDatabaseConfig[] = [];
   const pendingCreateSheetMap = new Map<string, Sheet>();
 
-  for (let i = 0; i < flattenSpecList.length; i++) {
-    const spec = flattenSpecList[i];
+  for (let i = 0; i < specs.length; i++) {
+    const spec = specs[i];
     const config = spec.changeDatabaseConfig;
     if (!config) continue;
     configWithSheetList.push(config);
@@ -139,8 +133,7 @@ const createSheets = async () => {
       const engine = await databaseEngineForSpec(spec);
       sheet.engine = engine;
       pendingCreateSheetMap.set(sheet.name, sheet);
-
-      await maybeFormatSQL(sheet, config.target);
+      await maybeFormatSQL(sheet, engine);
     }
   }
   const pendingCreateSheetList = Array.from(pendingCreateSheetMap.values());
@@ -162,20 +155,15 @@ const createSheets = async () => {
   });
 };
 
-const maybeFormatSQL = async (sheet: Sheet, target: string) => {
+const maybeFormatSQL = async (sheet: Sheet, engine: Engine) => {
   if (!formatOnSave.value) {
     return;
   }
-  const db = await useDatabaseV1Store().getOrFetchDatabaseByName(target);
-  if (!db) {
-    return;
-  }
-  const language = languageOfEngineV1(db.instanceResource.engine);
+  const language = languageOfEngineV1(engine);
   if (language !== "sql") {
     return;
   }
-
-  const dialect = dialectOfEngineV1(db.instanceResource.engine);
+  const dialect = dialectOfEngineV1(engine);
   const statement = getSheetStatement(sheet);
   if (statement.length > MAX_FORMATTABLE_STATEMENT_SIZE) {
     return;

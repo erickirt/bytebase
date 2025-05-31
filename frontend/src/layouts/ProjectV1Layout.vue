@@ -31,12 +31,17 @@
 
       <router-view
         v-if="hasPermission"
-        class="h-full"
         :project-id="projectId"
         :allow-edit="allowEdit"
         v-bind="$attrs"
       />
-      <NoPermissionPlaceholder v-else class="py-6" />
+      <NoPermissionPlaceholder v-else class="py-6">
+        <template v-if="hasCreateIssuePermission" #extra>
+          <NButton type="primary" @click="state.showRequestRolePanel = true">
+            {{ $t("issue.title.request-role") }}
+          </NButton>
+        </template>
+      </NoPermissionPlaceholder>
     </div>
   </template>
   <div
@@ -47,15 +52,14 @@
   </div>
 
   <GrantRequestPanel
-    v-if="!!state.requestRole"
+    v-if="state.showRequestRolePanel"
     :project-name="project.name"
-    :role="state.requestRole"
-    @close="state.requestRole = undefined"
+    @close="state.showRequestRolePanel = false"
   />
 </template>
 
 <script lang="ts" setup>
-import { FileDownIcon, FileSearchIcon } from "lucide-vue-next";
+import { UsersIcon } from "lucide-vue-next";
 import { NButton, NEllipsis, NSpin } from "naive-ui";
 import type { ClientError } from "nice-grpc-web";
 import { computed, watchEffect, h, reactive } from "vue";
@@ -90,24 +94,24 @@ import { State } from "@/types/proto/v1/common";
 import { hasProjectPermissionV2 } from "@/utils";
 
 interface LocalState {
-  requestRole?:
-    | PresetRoleType.SQL_EDITOR_USER
-    | PresetRoleType.PROJECT_EXPORTER;
+  showRequestRolePanel: boolean;
 }
 
 const props = defineProps<{
   projectId: string;
 }>();
 
-const state = reactive<LocalState>({});
+const state = reactive<LocalState>({
+  showRequestRolePanel: false,
+});
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const recentProjects = useRecentProjects();
 const projectStore = useProjectV1Store();
 const { remove: removeVisit } = useRecentVisit();
 const permissionStore = usePermissionStore();
-const { t } = useI18n();
 
 const hideQuickAction = useAppFeature("bb.feature.console.hide-quick-action");
 const hideDefaultProject = useAppFeature("bb.feature.project.hide-default");
@@ -159,6 +163,10 @@ const requiredPermissions = computed(() => {
   return permissions;
 });
 
+const hasCreateIssuePermission = computed(() =>
+  hasProjectPermissionV2(project.value, "bb.issues.create")
+);
+
 const hasPermission = computed(() => {
   return requiredPermissions.value.every((permission) =>
     hasProjectPermissionV2(project.value, permission)
@@ -195,14 +203,9 @@ const quickActionListForDatabase = computed(() => {
     hasDBAWorkflowFeature.value
   ) {
     actions.push({
-      title: t("custom-approval.risk-rule.risk.namespace.request_query"),
-      icon: () => h(FileSearchIcon),
-      action: () => (state.requestRole = PresetRoleType.SQL_EDITOR_USER),
-    });
-    actions.push({
-      title: t("custom-approval.risk-rule.risk.namespace.request_export"),
-      icon: () => h(FileDownIcon),
-      action: () => (state.requestRole = PresetRoleType.PROJECT_EXPORTER),
+      title: t("issue.title.request-role"),
+      icon: () => h(UsersIcon),
+      action: () => (state.showRequestRolePanel = true),
     });
   }
 

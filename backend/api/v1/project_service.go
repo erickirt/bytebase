@@ -420,6 +420,10 @@ func (s *ProjectService) UpdateProject(ctx context.Context, request *v1pb.Update
 			projectSettings := project.Setting
 			projectSettings.CiSamplingSize = request.Project.CiSamplingSize
 			patch.Setting = projectSettings
+		case "parallel_tasks_per_rollout":
+			projectSettings := project.Setting
+			projectSettings.ParallelTasksPerRollout = request.Project.ParallelTasksPerRollout
+			patch.Setting = projectSettings
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, `unsupport update_mask "%s"`, path)
 		}
@@ -564,16 +568,10 @@ func (s *ProjectService) BatchGetIamPolicy(ctx context.Context, request *v1pb.Ba
 
 // SetIamPolicy sets the IAM policy for a project.
 func (s *ProjectService) SetIamPolicy(ctx context.Context, request *v1pb.SetIamPolicyRequest) (*v1pb.IamPolicy, error) {
-	var oldIamPolicyMsg *store.IamPolicyMessage
-
 	projectID, err := common.GetProjectID(request.Resource)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	if err := s.validateIAMPolicy(ctx, request.Policy); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
 	project, err := s.store.GetProjectV2(ctx, &store.FindProjectMessage{
 		ResourceID: &projectID,
 	})
@@ -587,19 +585,27 @@ func (s *ProjectService) SetIamPolicy(ctx context.Context, request *v1pb.SetIamP
 		return nil, status.Errorf(codes.NotFound, "project %q has been deleted", request.Resource)
 	}
 
-	policy, err := convertToStoreIamPolicy(ctx, s.store, request.Policy)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	policyMessage, err := s.store.GetProjectIamPolicy(ctx, project.ResourceID)
+	oldIamPolicyMsg, err := s.store.GetProjectIamPolicy(ctx, project.ResourceID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to find project iam policy with error: %v", err.Error())
 	}
-	if request.Etag != "" && request.Etag != policyMessage.Etag {
+	if request.Etag != "" && request.Etag != oldIamPolicyMsg.Etag {
 		return nil, status.Errorf(codes.Aborted, "there is concurrent update to the project iam policy, please refresh and try again.")
 	}
-	oldIamPolicyMsg = policyMessage
+
+	existProjectOwner, err := validateIAMPolicy(ctx, s.store, s.iamManager, request.Policy, oldIamPolicyMsg)
+	if err != nil {
+		return nil, err
+	}
+	// Must contain one owner binding.
+	if !existProjectOwner {
+		return nil, status.Errorf(codes.InvalidArgument, "IAM Policy must have at least one binding with %s", base.ProjectOwner.String())
+	}
+
+	policy, err := convertToStoreIamPolicy(ctx, s.store, request.Policy)
+	if err != nil {
+		return nil, err
+	}
 
 	policyPayload, err := protojson.Marshal(policy)
 	if err != nil {
@@ -835,7 +841,7 @@ func (s *ProjectService) UpdateWebhook(ctx context.Context, request *v1pb.Update
 			if len(types) == 0 {
 				return nil, status.Errorf(codes.InvalidArgument, "notification types should not be empty")
 			}
-			update.ActivityList = types
+			update.Events = types
 		case "direct_message":
 			update.Payload = &storepb.ProjectWebhookPayload{
 				DirectMessage: request.Webhook.DirectMessage,
@@ -942,17 +948,17 @@ func (s *ProjectService) TestWebhook(ctx context.Context, request *v1pb.TestWebh
 	err = webhookplugin.Post(
 		webhook.Type,
 		webhookplugin.Context{
-			URL:          webhook.URL,
-			Level:        webhookplugin.WebhookInfo,
-			ActivityType: string(base.ActivityIssueCreate),
-			Title:        fmt.Sprintf("Test webhook %q", webhook.Title),
-			TitleZh:      fmt.Sprintf("测试 webhook %q", webhook.Title),
-			Description:  "This is a test",
-			Link:         fmt.Sprintf("%s/projects/%s/webhooks/%s", setting.ExternalUrl, project.ResourceID, fmt.Sprintf("%s-%d", slug.Make(webhook.Title), webhook.ID)),
-			ActorID:      base.SystemBotID,
-			ActorName:    "Bytebase",
-			ActorEmail:   s.store.GetSystemBotUser(ctx).Email,
-			CreatedTS:    time.Now().Unix(),
+			URL:         webhook.URL,
+			Level:       webhookplugin.WebhookInfo,
+			EventType:   string(base.EventTypeIssueCreate),
+			Title:       fmt.Sprintf("Test webhook %q", webhook.Title),
+			TitleZh:     fmt.Sprintf("测试 webhook %q", webhook.Title),
+			Description: "This is a test",
+			Link:        fmt.Sprintf("%s/projects/%s/webhooks/%s", setting.ExternalUrl, project.ResourceID, fmt.Sprintf("%s-%d", slug.Make(webhook.Title), webhook.ID)),
+			ActorID:     base.SystemBotID,
+			ActorName:   "Bytebase",
+			ActorEmail:  s.store.GetSystemBotUser(ctx).Email,
+			CreatedTS:   time.Now().Unix(),
 			Issue: &webhookplugin.Issue{
 				ID:          1,
 				Name:        "Test issue",
@@ -985,10 +991,10 @@ func convertToStoreProjectWebhookMessage(webhook *v1pb.Webhook) (*store.ProjectW
 		return nil, err
 	}
 	return &store.ProjectWebhookMessage{
-		Type:         tp,
-		URL:          webhook.Url,
-		Title:        webhook.Title,
-		ActivityList: activityTypes,
+		Type:   tp,
+		URL:    webhook.Url,
+		Title:  webhook.Title,
+		Events: activityTypes,
 		Payload: &storepb.ProjectWebhookPayload{
 			DirectMessage: webhook.DirectMessage,
 		},
@@ -1002,47 +1008,23 @@ func convertToActivityTypeStrings(types []v1pb.Activity_Type) ([]string, error) 
 		case v1pb.Activity_TYPE_UNSPECIFIED:
 			return nil, common.Errorf(common.Invalid, "activity type must not be unspecified")
 		case v1pb.Activity_TYPE_ISSUE_CREATE:
-			result = append(result, string(base.ActivityIssueCreate))
+			result = append(result, string(base.EventTypeIssueCreate))
 		case v1pb.Activity_TYPE_ISSUE_COMMENT_CREATE:
-			result = append(result, string(base.ActivityIssueCommentCreate))
+			result = append(result, string(base.EventTypeIssueCommentCreate))
 		case v1pb.Activity_TYPE_ISSUE_FIELD_UPDATE:
-			result = append(result, string(base.ActivityIssueFieldUpdate))
+			result = append(result, string(base.EventTypeIssueUpdate))
 		case v1pb.Activity_TYPE_ISSUE_STATUS_UPDATE:
-			result = append(result, string(base.ActivityIssueStatusUpdate))
+			result = append(result, string(base.EventTypeIssueStatusUpdate))
 		case v1pb.Activity_TYPE_ISSUE_APPROVAL_NOTIFY:
-			result = append(result, string(base.ActivityIssueApprovalNotify))
+			result = append(result, string(base.EventTypeIssueApprovalCreate))
 		case v1pb.Activity_TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE:
-			result = append(result, string(base.ActivityPipelineStageStatusUpdate))
-		case v1pb.Activity_TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE:
-			result = append(result, string(base.ActivityPipelineTaskStatusUpdate))
+			result = append(result, string(base.EventTypeStageStatusUpdate))
 		case v1pb.Activity_TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE:
-			result = append(result, string(base.ActivityPipelineTaskRunStatusUpdate))
-		case v1pb.Activity_TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE:
-			result = append(result, string(base.ActivityPipelineTaskStatementUpdate))
-		case v1pb.Activity_TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE:
-			result = append(result, string(base.ActivityPipelineTaskEarliestAllowedTimeUpdate))
-		case v1pb.Activity_TYPE_MEMBER_CREATE:
-			result = append(result, string(base.ActivityMemberCreate))
-		case v1pb.Activity_TYPE_MEMBER_ROLE_UPDATE:
-			result = append(result, string(base.ActivityMemberRoleUpdate))
-		case v1pb.Activity_TYPE_MEMBER_ACTIVATE:
-			result = append(result, string(base.ActivityMemberActivate))
-		case v1pb.Activity_TYPE_MEMBER_DEACTIVATE:
-			result = append(result, string(base.ActivityMemberDeactivate))
-		case v1pb.Activity_TYPE_PROJECT_REPOSITORY_PUSH:
-			result = append(result, string(base.ActivityProjectRepositoryPush))
-		case v1pb.Activity_TYPE_PROJECT_DATABASE_TRANSFER:
-			result = append(result, string(base.ActivityProjectDatabaseTransfer))
-		case v1pb.Activity_TYPE_PROJECT_MEMBER_CREATE:
-			result = append(result, string(base.ActivityProjectMemberCreate))
-		case v1pb.Activity_TYPE_PROJECT_MEMBER_DELETE:
-			result = append(result, string(base.ActivityProjectMemberDelete))
-		case v1pb.Activity_TYPE_SQL_EDITOR_QUERY:
-			result = append(result, string(base.ActivitySQLQuery))
+			result = append(result, string(base.EventTypeTaskRunStatusUpdate))
 		case v1pb.Activity_TYPE_NOTIFY_ISSUE_APPROVED:
-			result = append(result, string(base.ActivityNotifyIssueApproved))
+			result = append(result, string(base.EventTypeIssueApprovalPass))
 		case v1pb.Activity_TYPE_NOTIFY_PIPELINE_ROLLOUT:
-			result = append(result, string(base.ActivityNotifyPipelineRollout))
+			result = append(result, string(base.EventTypeIssueRolloutReady))
 		default:
 			return nil, common.Errorf(common.Invalid, "unsupported activity type: %v", tp)
 		}
@@ -1054,47 +1036,23 @@ func convertNotificationTypeStrings(types []string) []v1pb.Activity_Type {
 	var result []v1pb.Activity_Type
 	for _, tp := range types {
 		switch tp {
-		case string(base.ActivityIssueCreate):
+		case string(base.EventTypeIssueCreate):
 			result = append(result, v1pb.Activity_TYPE_ISSUE_CREATE)
-		case string(base.ActivityIssueCommentCreate):
+		case string(base.EventTypeIssueCommentCreate):
 			result = append(result, v1pb.Activity_TYPE_ISSUE_COMMENT_CREATE)
-		case string(base.ActivityIssueFieldUpdate):
+		case string(base.EventTypeIssueUpdate):
 			result = append(result, v1pb.Activity_TYPE_ISSUE_FIELD_UPDATE)
-		case string(base.ActivityIssueStatusUpdate):
+		case string(base.EventTypeIssueStatusUpdate):
 			result = append(result, v1pb.Activity_TYPE_ISSUE_STATUS_UPDATE)
-		case string(base.ActivityIssueApprovalNotify):
+		case string(base.EventTypeIssueApprovalCreate):
 			result = append(result, v1pb.Activity_TYPE_ISSUE_APPROVAL_NOTIFY)
-		case string(base.ActivityPipelineStageStatusUpdate):
+		case string(base.EventTypeStageStatusUpdate):
 			result = append(result, v1pb.Activity_TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE)
-		case string(base.ActivityPipelineTaskStatusUpdate):
-			result = append(result, v1pb.Activity_TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE)
-		case string(base.ActivityPipelineTaskRunStatusUpdate):
+		case string(base.EventTypeTaskRunStatusUpdate):
 			result = append(result, v1pb.Activity_TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE)
-		case string(base.ActivityPipelineTaskStatementUpdate):
-			result = append(result, v1pb.Activity_TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE)
-		case string(base.ActivityPipelineTaskEarliestAllowedTimeUpdate):
-			result = append(result, v1pb.Activity_TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE)
-		case string(base.ActivityMemberCreate):
-			result = append(result, v1pb.Activity_TYPE_MEMBER_CREATE)
-		case string(base.ActivityMemberRoleUpdate):
-			result = append(result, v1pb.Activity_TYPE_MEMBER_ROLE_UPDATE)
-		case string(base.ActivityMemberActivate):
-			result = append(result, v1pb.Activity_TYPE_MEMBER_ACTIVATE)
-		case string(base.ActivityMemberDeactivate):
-			result = append(result, v1pb.Activity_TYPE_MEMBER_DEACTIVATE)
-		case string(base.ActivityProjectRepositoryPush):
-			result = append(result, v1pb.Activity_TYPE_PROJECT_REPOSITORY_PUSH)
-		case string(base.ActivityProjectDatabaseTransfer):
-			result = append(result, v1pb.Activity_TYPE_PROJECT_DATABASE_TRANSFER)
-		case string(base.ActivityProjectMemberCreate):
-			result = append(result, v1pb.Activity_TYPE_PROJECT_MEMBER_CREATE)
-		case string(base.ActivityProjectMemberDelete):
-			result = append(result, v1pb.Activity_TYPE_PROJECT_MEMBER_DELETE)
-		case string(base.ActivitySQLQuery):
-			result = append(result, v1pb.Activity_TYPE_SQL_EDITOR_QUERY)
-		case string(base.ActivityNotifyIssueApproved):
+		case string(base.EventTypeIssueApprovalPass):
 			result = append(result, v1pb.Activity_TYPE_NOTIFY_ISSUE_APPROVED)
-		case string(base.ActivityNotifyPipelineRollout):
+		case string(base.EventTypeIssueRolloutReady):
 			result = append(result, v1pb.Activity_TYPE_NOTIFY_PIPELINE_ROLLOUT)
 		default:
 			result = append(result, v1pb.Activity_TYPE_UNSPECIFIED)
@@ -1249,10 +1207,10 @@ func convertToStoreIamPolicy(ctx context.Context, stores *store.Store, iamPolicy
 
 	for _, binding := range iamPolicy.Bindings {
 		var members []string
-		for _, member := range binding.Members {
+		for _, member := range utils.Uniq(binding.Members) {
 			storeMember, err := convertToStoreIamPolicyMember(ctx, stores, member)
 			if err != nil {
-				return nil, err
+				return nil, status.Errorf(codes.Internal, "failed to convert iam member with error: %v", err.Error())
 			}
 			members = append(members, storeMember)
 		}
@@ -1269,6 +1227,10 @@ func convertToStoreIamPolicy(ctx context.Context, stores *store.Store, iamPolicy
 			storeBinding.Condition = &expr.Expr{}
 		}
 		bindings = append(bindings, storeBinding)
+	}
+
+	if len(bindings) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "policy binding is empty")
 	}
 
 	return &storepb.IamPolicy{
@@ -1304,7 +1266,7 @@ func convertToProject(projectMessage *store.ProjectMessage) *v1pb.Project {
 			Type:              convertWebhookTypeString(webhook.Type),
 			Title:             webhook.Title,
 			Url:               webhook.URL,
-			NotificationTypes: convertNotificationTypeStrings(webhook.ActivityList),
+			NotificationTypes: convertNotificationTypeStrings(webhook.Events),
 			DirectMessage:     webhook.Payload.GetDirectMessage(),
 		})
 	}
@@ -1335,6 +1297,7 @@ func convertToProject(projectMessage *store.ProjectMessage) *v1pb.Project {
 		AllowSelfApproval:          projectMessage.Setting.AllowSelfApproval,
 		ExecutionRetryPolicy:       convertToV1ExecutionRetryPolicy(projectMessage.Setting.ExecutionRetryPolicy),
 		CiSamplingSize:             projectMessage.Setting.CiSamplingSize,
+		ParallelTasksPerRollout:    projectMessage.Setting.ParallelTasksPerRollout,
 	}
 }
 
@@ -1370,6 +1333,7 @@ func convertToProjectMessage(resourceID string, project *v1pb.Project) (*store.P
 		PostgresDatabaseTenantMode: project.PostgresDatabaseTenantMode,
 		AllowSelfApproval:          project.AllowSelfApproval,
 		CiSamplingSize:             project.CiSamplingSize,
+		ParallelTasksPerRollout:    project.ParallelTasksPerRollout,
 	}
 	return &store.ProjectMessage{
 		ResourceID: resourceID,
@@ -1378,84 +1342,112 @@ func convertToProjectMessage(resourceID string, project *v1pb.Project) (*store.P
 	}, nil
 }
 
-func (s *ProjectService) validateIAMPolicy(ctx context.Context, policy *v1pb.IamPolicy) error {
+func getBindingIdentifier(role string, condition *expr.Expr) string {
+	ids := []string{
+		fmt.Sprintf("[role] %s", role),
+	}
+	if condition != nil {
+		ids = append(
+			ids,
+			fmt.Sprintf("[title] %s", condition.Title),
+			fmt.Sprintf("[description] %s", condition.Description),
+			fmt.Sprintf("[expression] %s", condition.Expression),
+		)
+	}
+	return strings.Join(ids, ";")
+}
+
+func validateIAMPolicy(
+	ctx context.Context,
+	stores *store.Store,
+	iamManager *iam.Manager,
+	policy *v1pb.IamPolicy,
+	oldPolicyMessage *store.IamPolicyMessage,
+) (bool, error) {
 	if policy == nil {
-		return errors.Errorf("IAM Policy is required")
+		return false, status.Error(codes.InvalidArgument, "IAM Policy is required")
+	}
+	if len(policy.Bindings) == 0 {
+		return false, status.Error(codes.InvalidArgument, "IAM Binding is empty")
 	}
 
-	generalSetting, err := s.store.GetWorkspaceGeneralSetting(ctx)
+	generalSetting, err := stores.GetWorkspaceGeneralSetting(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to get workspace general setting")
+		return false, status.Error(codes.Internal, "failed to get workspace general setting")
 	}
 	var maximumRoleExpiration *durationpb.Duration
 	if generalSetting != nil {
 		maximumRoleExpiration = generalSetting.MaximumRoleExpiration
 	}
 
-	roleMessages, err := s.store.ListRoles(ctx)
+	roleMessages, err := stores.ListRoles(ctx)
 	if err != nil {
-		return status.Errorf(codes.Internal, "failed to list roles: %v", err)
+		return false, status.Errorf(codes.Internal, "failed to list roles: %v", err)
 	}
-	roles := convertToRoles(roleMessages, v1pb.Role_CUSTOM)
-	for _, predefinedRole := range s.iamManager.PredefinedRoles {
-		roles = append(roles, convertToRole(predefinedRole, v1pb.Role_BUILT_IN))
+	roleMessages = append(roleMessages, iamManager.PredefinedRoles...)
+
+	existingBindings := make(map[string]bool)
+	for _, oldBinding := range oldPolicyMessage.Policy.Bindings {
+		identifier := getBindingIdentifier(oldBinding.Role, oldBinding.Condition)
+		existingBindings[identifier] = true
 	}
 
-	return s.validateBindings(policy.Bindings, roles, maximumRoleExpiration)
+	existProjectOwner := false
+	bindings := []*v1pb.Binding{}
+	for _, binding := range policy.Bindings {
+		if len(binding.Members) == 0 {
+			continue
+		}
+		if binding.Role == fmt.Sprintf("roles/%s", base.ProjectOwner) {
+			existProjectOwner = true
+		}
+
+		identifier := getBindingIdentifier(binding.Role, binding.Condition)
+		if !existingBindings[identifier] {
+			bindings = append(bindings, binding)
+		}
+	}
+
+	return existProjectOwner, validateBindings(bindings, roleMessages, maximumRoleExpiration)
 }
 
-func (*ProjectService) validateBindings(bindings []*v1pb.Binding, roles []*v1pb.Role, maximumRoleExpiration *durationpb.Duration) error {
-	if len(bindings) == 0 {
-		return errors.Errorf("IAM Binding is required")
-	}
-
-	projectRoleMap := make(map[string]bool)
+func validateBindings(bindings []*v1pb.Binding, roles []*store.RoleMessage, maximumRoleExpiration *durationpb.Duration) error {
 	existingRoles := make(map[string]bool)
 	for _, role := range roles {
-		existingRoles[role.Name] = true
+		existingRoles[common.FormatRole(role.ResourceID)] = true
 	}
+
 	for _, binding := range bindings {
 		if binding.Role == "" {
-			return errors.Errorf("IAM Binding role is required")
+			return status.Error(codes.InvalidArgument, "IAM Binding role is required")
 		}
 		if !existingRoles[binding.Role] {
-			return errors.Errorf("IAM Binding role %s does not exist", binding.Role)
+			return status.Errorf(codes.InvalidArgument, "IAM Binding role %s does not exist", binding.Role)
 		}
-
-		// Users within each binding must be unique.
-		binding.Members = utils.Uniq(binding.Members)
-		for _, member := range binding.Members {
-			if err := validateMember(member); err != nil {
-				return err
-			}
-		}
-		projectRoleMap[binding.Role] = true
 
 		if _, err := common.ValidateProjectMemberCELExpr(binding.Condition); err != nil {
 			return err
 		}
 
-		// Only validate when maximumRoleExpiration is set and the role is SQLEditorUser or ProjectExporter.
-		rolesToValidate := []string{fmt.Sprintf("roles/%s", base.SQLEditorUser), fmt.Sprintf("roles/%s", base.ProjectExporter)}
-		if maximumRoleExpiration != nil && binding.Condition != nil && binding.Condition.Expression != "" && slices.Contains(rolesToValidate, binding.Role) {
-			if err := validateIAMPolicyExpression(binding.Condition.Expression, maximumRoleExpiration); err != nil {
-				return err
+		if binding.Role != fmt.Sprintf("roles/%s", base.ProjectOwner) && maximumRoleExpiration != nil {
+			// Only validate when maximumRoleExpiration is set and the role is not project owner.
+			if err := validateExpirationInExpression(binding.GetCondition().GetExpression(), maximumRoleExpiration); err != nil {
+				return status.Errorf(codes.InvalidArgument, "failed to validate expiration for binding %v: %v", binding.Role, err.Error())
 			}
 		}
-	}
-	// Must contain one owner binding.
-	if _, ok := projectRoleMap[common.FormatRole(base.ProjectOwner.String())]; !ok {
-		return errors.Errorf("IAM Policy must have at least one binding with %s", base.ProjectOwner.String())
 	}
 	return nil
 }
 
-// validateIAMPolicyExpression validates the IAM policy expression.
+// validateExpirationInExpression validates the IAM policy expression.
 // Currently only validate the following expression:
 // * request.time < timestamp("2021-01-01T00:00:00Z")
 //
 // Other expressions will be ignored.
-func validateIAMPolicyExpression(expr string, maximumRoleExpiration *durationpb.Duration) error {
+func validateExpirationInExpression(expr string, maximumRoleExpiration *durationpb.Duration) error {
+	if expr == "" {
+		return nil
+	}
 	e, err := cel.NewEnv()
 	if err != nil {
 		return errors.Wrap(err, "failed to create cel environment")

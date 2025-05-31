@@ -3,7 +3,6 @@
 </template>
 
 <script lang="tsx" setup>
-import dayjs from "dayjs";
 import type { h } from "vue";
 import { defineComponent } from "vue";
 import { Translation, useI18n } from "vue-i18n";
@@ -13,7 +12,7 @@ import {
   type ComposedIssueComment,
 } from "@/store";
 import { extractUserId } from "@/store";
-import { getDateForPbTimestamp, type ComposedIssue } from "@/types";
+import { type ComposedIssue } from "@/types";
 import {
   IssueComment_Approval,
   IssueComment_Approval_Status,
@@ -100,14 +99,8 @@ const renderActionSentence = () => {
     };
     return renderVerbTypeTarget(params);
   } else if (issueComment.type === IssueCommentType.TASK_UPDATE) {
-    const {
-      tasks,
-      fromSheet,
-      toSheet,
-      fromEarliestAllowedTime,
-      toEarliestAllowedTime,
-      toStatus,
-    } = IssueComment_TaskUpdate.fromPartial(issueComment.taskUpdate || {});
+    const { tasks, fromSheet, toSheet, toStatus } =
+      IssueComment_TaskUpdate.fromPartial(issueComment.taskUpdate || {});
 
     if (toStatus !== undefined) {
       const params: VerbTypeTarget = {
@@ -165,22 +158,6 @@ const renderActionSentence = () => {
           }}
         </Translation>
       );
-    } else if (
-      fromEarliestAllowedTime !== undefined ||
-      toEarliestAllowedTime !== undefined
-    ) {
-      const oldVal = fromEarliestAllowedTime;
-      const newVal = toEarliestAllowedTime;
-      const timeFormat = "YYYY-MM-DD HH:mm:ss UTCZZ";
-      return t("activity.sentence.changed-from-to", {
-        name: t("task.rollout-time"),
-        oldValue: oldVal
-          ? dayjs(getDateForPbTimestamp(oldVal)).format(timeFormat)
-          : "Unset",
-        newValue: newVal
-          ? dayjs(getDateForPbTimestamp(newVal)).format(timeFormat)
-          : "Unset",
-      });
     }
   } else if (issueComment.type === IssueCommentType.TASK_PRIOR_BACKUP) {
     const { task, tables, originalLine, database, error } =

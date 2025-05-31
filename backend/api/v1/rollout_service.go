@@ -76,12 +76,14 @@ func (s *RolloutService) PreviewRollout(ctx context.Context, request *v1pb.Previ
 		return nil, status.Errorf(codes.NotFound, "project %q not found", projectID)
 	}
 
-	if err := validateSteps(request.Plan.Steps); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to validate plan steps, error: %v", err)
+	// Validate plan specs
+	if err := validateSpecs(request.Plan.Specs); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "failed to validate plan specs, error: %v", err)
 	}
-	steps := convertPlanSteps(request.Plan.Steps)
 
-	rollout, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.licenseService, s.dbFactory, request.GetPlan().GetName(), steps, nil /* snapshot */, project)
+	specs := convertPlanSpecs(request.Plan.Specs)
+
+	rollout, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.dbFactory, request.GetPlan().GetName(), specs, nil /* snapshot */, project)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get pipeline create, error: %v", err)
 	}
@@ -229,14 +231,14 @@ func (s *RolloutService) CreateRollout(ctx context.Context, request *v1pb.Create
 	if rolloutTitle == "" {
 		rolloutTitle = plan.Name
 	}
-	pipelineCreate, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.licenseService, s.dbFactory, rolloutTitle, plan.Config.GetSteps(), plan.Config.GetDeployment(), project)
+	pipelineCreate, err := GetPipelineCreate(ctx, s.store, s.sheetManager, s.dbFactory, rolloutTitle, plan.Config.GetSpecs(), plan.Config.GetDeployment(), project)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to get pipeline create, error: %v", err)
 	}
 	if len(pipelineCreate.Stages) == 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "no database matched for deployment, hint: check deployment config setting that the target database is in a stage")
 	}
-	if isChangeDatabasePlan(plan.Config.GetSteps()) {
+	if isChangeDatabasePlan(plan.Config.GetSpecs()) {
 		pipelineCreate, err = getPipelineCreateToTargetStage(ctx, s.store, plan.Config.GetDeployment().GetEnvironments(), pipelineCreate, request.Target)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to filter stages with stageId, error: %v", err)
@@ -590,6 +592,10 @@ func (s *RolloutService) BatchRunTasks(ctx context.Context, request *v1pb.BatchR
 			sheetUID := int(task.Payload.GetSheetId())
 			create.SheetUID = &sheetUID
 		}
+		if request.GetRunTime() != nil {
+			t := request.GetRunTime().AsTime()
+			create.RunAt = &t
+		}
 		taskRunCreates = append(taskRunCreates, create)
 	}
 	sort.Slice(taskRunCreates, func(i, j int) bool {
@@ -607,7 +613,7 @@ func (s *RolloutService) BatchRunTasks(ctx context.Context, request *v1pb.BatchR
 	}
 	s.webhookManager.CreateEvent(ctx, &webhook.Event{
 		Actor:   user,
-		Type:    webhook.EventTypeTaskRunStatusUpdate,
+		Type:    base.EventTypeTaskRunStatusUpdate,
 		Comment: request.Reason,
 		Issue:   webhook.NewIssue(issueN),
 		Project: webhook.NewProject(project),
@@ -719,7 +725,7 @@ func (s *RolloutService) BatchSkipTasks(ctx context.Context, request *v1pb.Batch
 	}
 	s.webhookManager.CreateEvent(ctx, &webhook.Event{
 		Actor:   user,
-		Type:    webhook.EventTypeTaskRunStatusUpdate,
+		Type:    base.EventTypeTaskRunStatusUpdate,
 		Comment: request.Reason,
 		Issue:   webhook.NewIssue(issueN),
 		Project: webhook.NewProject(project),
@@ -852,7 +858,7 @@ func (s *RolloutService) BatchCancelTaskRuns(ctx context.Context, request *v1pb.
 	}
 	s.webhookManager.CreateEvent(ctx, &webhook.Event{
 		Actor:   user,
-		Type:    webhook.EventTypeTaskRunStatusUpdate,
+		Type:    base.EventTypeTaskRunStatusUpdate,
 		Comment: request.Reason,
 		Issue:   webhook.NewIssue(issueN),
 		Rollout: webhook.NewRollout(rollout),
@@ -936,30 +942,22 @@ func (s *RolloutService) PreviewTaskRunRollback(ctx context.Context, request *v1
 	}, nil
 }
 
-func isChangeDatabasePlan(steps []*storepb.PlanConfig_Step) bool {
-	for _, step := range steps {
-		for _, spec := range step.GetSpecs() {
-			if spec.GetChangeDatabaseConfig() != nil {
-				return true
-			}
+func isChangeDatabasePlan(specs []*storepb.PlanConfig_Spec) bool {
+	for _, spec := range specs {
+		if spec.GetChangeDatabaseConfig() != nil {
+			return true
 		}
 	}
 	return false
 }
 
 // GetPipelineCreate gets a pipeline create message from a plan.
-func GetPipelineCreate(ctx context.Context, s *store.Store, sheetManager *sheet.Manager, licenseService enterprise.LicenseService, dbFactory *dbfactory.DBFactory, rolloutTitle string, steps []*storepb.PlanConfig_Step, deployment *storepb.PlanConfig_Deployment /* nullable */, project *store.ProjectMessage) (*store.PipelineMessage, error) {
-	// Flatten all specs from steps.
-	var specs []*storepb.PlanConfig_Spec
-	for _, step := range steps {
-		specs = append(specs, step.Specs...)
-	}
-
+func GetPipelineCreate(ctx context.Context, s *store.Store, sheetManager *sheet.Manager, dbFactory *dbfactory.DBFactory, rolloutTitle string, specs []*storepb.PlanConfig_Spec, deployment *storepb.PlanConfig_Deployment /* nullable */, project *store.ProjectMessage) (*store.PipelineMessage, error) {
 	// Step 1 - transform database group specs.
 	// Others are untouched.
-	transformSpecs, err := transformDatabaseGroupSpecs(ctx, s, project, specs, deployment)
+	transformedSpecs, err := applyDatabaseGroupSpecTransformations(specs, deployment)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to transform database group specs")
+		return nil, errors.Wrap(err, "failed to apply database group spec transformations")
 	}
 
 	// Step 2 - list snapshot environments.
@@ -980,8 +978,8 @@ func GetPipelineCreate(ctx context.Context, s *store.Store, sheetManager *sheet.
 
 	// Step 3 - convert all task creates.
 	var taskCreates []*store.TaskMessage
-	for _, spec := range transformSpecs {
-		tcs, err := getTaskCreatesFromSpec(ctx, s, sheetManager, licenseService, dbFactory, spec, project)
+	for _, spec := range transformedSpecs {
+		tcs, err := getTaskCreatesFromSpec(ctx, s, sheetManager, dbFactory, spec, project)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get task creates from spec")
 		}
@@ -1000,8 +998,8 @@ func GetPipelineCreate(ctx context.Context, s *store.Store, sheetManager *sheet.
 	}
 
 	// Step 5 - build tasks for each stage.
-	for _, spec := range transformSpecs {
-		tc, err := getTaskCreatesFromSpec(ctx, s, sheetManager, licenseService, dbFactory, spec, project)
+	for _, spec := range transformedSpecs {
+		tc, err := getTaskCreatesFromSpec(ctx, s, sheetManager, dbFactory, spec, project)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get task creates from spec")
 		}

@@ -111,6 +111,8 @@ func (d *Driver) Open(ctx context.Context, _ storepb.Engine, config db.Connectio
 	}
 	d.config = config
 
+	pgxConnConfig.OnNotice = d.onNotice
+
 	d.connectionString = stdlib.RegisterConnConfig(pgxConnConfig)
 	db, err := sql.Open(driverName, d.connectionString)
 	if err != nil {
@@ -128,6 +130,43 @@ func (d *Driver) Open(ctx context.Context, _ storepb.Engine, config db.Connectio
 	}
 	d.connectionCtx = config.ConnectionContext
 	return d, nil
+}
+
+func (d *Driver) onNotice(_ *pgconn.PgConn, n *pgconn.Notice) {
+	if n == nil {
+		return
+	}
+
+	d.connectionCtx.AppendMessage(&v1pb.QueryResult_Message{
+		Level:   convertLevel(n.Severity),
+		Content: n.Message,
+	})
+}
+
+func convertLevel(level string) v1pb.QueryResult_Message_Level {
+	switch level {
+	case "DEBUG":
+		return v1pb.QueryResult_Message_DEBUG
+	case "INFO":
+		return v1pb.QueryResult_Message_INFO
+	case "NOTICE":
+		return v1pb.QueryResult_Message_NOTICE
+	case "WARNING":
+		return v1pb.QueryResult_Message_WARNING
+	case "EXCEPTION":
+		return v1pb.QueryResult_Message_EXCEPTION
+	case "LOG":
+		return v1pb.QueryResult_Message_LOG
+	default:
+		return v1pb.QueryResult_Message_LEVEL_UNSPECIFIED
+	}
+}
+
+// PushAndClearMessages pushes and clears the messages.
+func (d *Driver) PushAndClearMessages() []*v1pb.QueryResult_Message {
+	messages := d.connectionCtx.MessageBuffer
+	d.connectionCtx.MessageBuffer = nil
+	return messages
 }
 
 func getPGConnectionConfig(config db.ConnectionConfig) (*pgx.ConnConfig, error) {
@@ -271,6 +310,23 @@ func (d *Driver) getDatabases(ctx context.Context) ([]*storepb.DatabaseSchemaMet
 		return nil, err
 	}
 	return databases, nil
+}
+
+// GetSearchPath gets the current search path of the database.
+// It returns the search path as a raw comma-separated string of schema names.
+func (d *Driver) GetSearchPath(ctx context.Context) (string, error) {
+	// SHOW search_path returns the current search path.
+	// PostgreSQL supports it since 8.2.
+	// https://www.postgresql.org/docs/current/sql-show.html
+	query := "SHOW search_path"
+	var searchPath string
+	if err := d.db.QueryRowContext(ctx, query).Scan(&searchPath); err != nil {
+		if err == sql.ErrNoRows {
+			return "", common.FormatDBErrorEmptyRowWithQuery(query)
+		}
+		return "", util.FormatErrorWithQuery(err, query)
+	}
+	return strings.TrimSpace(searchPath), nil
 }
 
 // getVersion gets the version of Postgres server.
@@ -493,15 +549,9 @@ func (d *Driver) tryExecute(
 					opts.LogCommandResponse(indexes, 0, nil, err.Error())
 
 					return &db.ErrorWithPosition{
-						Err: errors.Wrapf(err, "failed to execute context in a transaction"),
-						Start: &storepb.Position{
-							Line:   int32(command.FirstStatementLine),
-							Column: int32(command.FirstStatementColumn),
-						},
-						End: &storepb.Position{
-							Line:   int32(command.LastLine),
-							Column: int32(command.LastColumn),
-						},
+						Err:   errors.Wrapf(err, "failed to execute context in a transaction"),
+						Start: command.Start,
+						End:   command.End,
 					}
 				}
 
@@ -652,7 +702,7 @@ func (d *Driver) GetCurrentDatabaseOwner(ctx context.Context) (string, error) {
 }
 
 // QueryConn queries a SQL statement in a given connection.
-func (*Driver) QueryConn(ctx context.Context, conn *sql.Conn, statement string, queryContext db.QueryContext) ([]*v1pb.QueryResult, error) {
+func (d *Driver) QueryConn(ctx context.Context, conn *sql.Conn, statement string, queryContext db.QueryContext) ([]*v1pb.QueryResult, error) {
 	singleSQLs, err := pgparser.SplitSQL(statement)
 	if err != nil {
 		return nil, err
@@ -702,6 +752,7 @@ func (*Driver) QueryConn(ctx context.Context, conn *sql.Conn, statement string, 
 				if err != nil {
 					return nil, err
 				}
+				r.Messages = d.PushAndClearMessages()
 				if err := rows.Err(); err != nil {
 					return nil, err
 				}
@@ -716,7 +767,7 @@ func (*Driver) QueryConn(ctx context.Context, conn *sql.Conn, statement string, 
 			if err != nil {
 				slog.Info("rowsAffected returns error", log.BBError(err))
 			}
-			return util.BuildAffectedRowsResult(affectedRows), nil
+			return util.BuildAffectedRowsResult(affectedRows, d.PushAndClearMessages()), nil
 		}()
 		stop := false
 		if err != nil {
@@ -777,6 +828,17 @@ func getStatementWithResultLimit(stmt string, limit int) string {
 }
 
 func isPlSQLBlock(stmt string) bool {
+	defer func() {
+		if r := recover(); r != nil {
+			perr, ok := r.(error)
+			if !ok {
+				perr = errors.Errorf("%v", r)
+			}
+			err := errors.Errorf("PANIC RECOVER, err: %v", perr)
+			stmtT, _ := common.TruncateString(stmt, 1000)
+			slog.Info("isPlSQLBlock panic", log.BBError(err), "stmt_truncated", stmtT)
+		}
+	}()
 	tree, err := pgquery.Parse(stmt)
 	if err != nil {
 		return false

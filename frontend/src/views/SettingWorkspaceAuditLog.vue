@@ -12,6 +12,7 @@
             ExportFormat.XLSX,
           ]"
           :tooltip="disableExportTip"
+          :view-mode="'DROPDOWN'"
           :disabled="!hasAuditLogFeature || !!disableExportTip"
           @export="handleExport"
         />
@@ -54,8 +55,8 @@ import {
   featureToRef,
   useAuditLogStore,
   batchGetOrFetchProjects,
-  batchGetOrFetchUsers,
   pushNotification,
+  useUserStore,
 } from "@/store";
 import { projectNamePrefix } from "@/store/modules/v1/common";
 import { type SearchAuditLogsParams } from "@/types";
@@ -68,9 +69,16 @@ interface LocalState {
 }
 
 const defaultSearchParams = () => {
+  const to = dayjs().endOf("day");
+  const from = to.add(-30, "day");
   const params: SearchParams = {
     query: "",
-    scopes: [],
+    scopes: [
+      {
+        id: "created",
+        value: `${from.valueOf()},${to.valueOf()}`,
+      },
+    ],
   };
   return params;
 };
@@ -111,7 +119,7 @@ const fetchAuditLog = async ({
       return `${projectNamePrefix}${projectResourceId}`;
     })
   );
-  await batchGetOrFetchUsers(auditLogs.map((log) => log.user));
+  await useUserStore().batchGetUsers(auditLogs.map((log) => log.user));
   return { nextPageToken, list: auditLogs };
 };
 

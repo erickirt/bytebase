@@ -43,33 +43,9 @@ func NewManager(store *store.Store, iamManager *iam.Manager) *Manager {
 }
 
 func (m *Manager) CreateEvent(ctx context.Context, e *Event) {
-	var activityType base.ActivityType
-	//exhaustive:enforce
-	switch e.Type {
-	case EventTypeIssueCreate:
-		activityType = base.ActivityIssueCreate
-	case EventTypeIssueUpdate:
-		activityType = base.ActivityIssueFieldUpdate
-	case EventTypeIssueStatusUpdate:
-		activityType = base.ActivityIssueStatusUpdate
-	case EventTypeIssueCommentCreate:
-		activityType = base.ActivityIssueCommentCreate
-	case EventTypeIssueApprovalCreate:
-		activityType = base.ActivityIssueApprovalNotify
-	case EventTypeIssueApprovalPass:
-		activityType = base.ActivityNotifyIssueApproved
-	case EventTypeIssueRolloutReady:
-		activityType = base.ActivityNotifyPipelineRollout
-	case EventTypeStageStatusUpdate:
-		activityType = base.ActivityPipelineStageStatusUpdate
-	case EventTypeTaskRunStatusUpdate:
-		activityType = base.ActivityPipelineTaskRunStatusUpdate
-	default:
-		return
-	}
 	webhookList, err := m.store.FindProjectWebhookV2(ctx, &store.FindProjectWebhookMessage{
-		ProjectID:    &e.Project.ResourceID,
-		ActivityType: &activityType,
+		ProjectID: &e.Project.ResourceID,
+		EventType: &e.Type,
 	})
 	if err != nil {
 		slog.Warn("failed to find project webhook", "issue_name", e.Issue.Title, log.BBError(err))
@@ -80,7 +56,7 @@ func (m *Manager) CreateEvent(ctx context.Context, e *Event) {
 		return
 	}
 
-	webhookCtx, err := m.getWebhookContextFromEvent(ctx, e, activityType)
+	webhookCtx, err := m.getWebhookContextFromEvent(ctx, e, e.Type)
 	if err != nil {
 		slog.Warn("failed to get webhook context",
 			slog.String("issue_name", e.Issue.Title),
@@ -91,7 +67,7 @@ func (m *Manager) CreateEvent(ctx context.Context, e *Event) {
 	go m.postWebhookList(ctx, webhookCtx, webhookList)
 }
 
-func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, activityType base.ActivityType) (*webhook.Context, error) {
+func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, eventType base.EventType) (*webhook.Context, error) {
 	var webhookCtx webhook.Context
 	var mentions []string
 	var mentionUsers []*store.UserMessage
@@ -111,11 +87,11 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, acti
 		link = fmt.Sprintf("%s/projects/%s/rollouts/%d", setting.ExternalUrl, e.Project.ResourceID, e.Rollout.UID)
 	}
 	switch e.Type {
-	case EventTypeIssueCreate:
+	case base.EventTypeIssueCreate:
 		title = "Issue created"
 		titleZh = "创建工单"
 
-	case EventTypeIssueStatusUpdate:
+	case base.EventTypeIssueStatusUpdate:
 		switch e.Issue.Status {
 		case "OPEN":
 			title = "Issue reopened"
@@ -129,11 +105,11 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, acti
 			titleZh = "工单取消"
 		}
 
-	case EventTypeIssueCommentCreate:
+	case base.EventTypeIssueCommentCreate:
 		title = "Comment created"
 		titleZh = "工单新评论"
 
-	case EventTypeIssueUpdate:
+	case base.EventTypeIssueUpdate:
 		update := e.IssueUpdate
 		switch update.Path {
 		case "description":
@@ -147,7 +123,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, acti
 			titleZh = "工单信息变更"
 		}
 
-	case EventTypeStageStatusUpdate:
+	case base.EventTypeStageStatusUpdate:
 		u := e.StageStatusUpdate
 		if e.Issue != nil {
 			link = fmt.Sprintf("%s/projects/%s/issues/%s-%d?stage=%d", setting.ExternalUrl, e.Project.ResourceID, slug.Make(e.Issue.Title), e.Issue.UID, u.StageUID)
@@ -155,7 +131,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, acti
 		title = "Stage ends"
 		titleZh = "阶段结束"
 
-	case EventTypeTaskRunStatusUpdate:
+	case base.EventTypeTaskRunStatusUpdate:
 		u := e.TaskRunStatusUpdate
 		switch u.Status {
 		case base.TaskRunPending.String():
@@ -183,7 +159,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, acti
 			titleZh = "任务状态变更"
 		}
 
-	case EventTypeIssueApprovalPass:
+	case base.EventTypeIssueApprovalPass:
 		title = "Issue approved"
 		titleZh = "工单审批通过"
 
@@ -195,7 +171,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, acti
 			mentions = append(mentions, phone)
 		}
 
-	case EventTypeIssueRolloutReady:
+	case base.EventTypeIssueRolloutReady:
 		u := e.IssueRolloutReady
 		title = "Issue is waiting for rollout"
 		titleZh = "工单待发布"
@@ -247,7 +223,7 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, acti
 			}
 		}
 
-	case EventTypeIssueApprovalCreate:
+	case base.EventTypeIssueApprovalCreate:
 		pendingStep := e.IssueApprovalCreate.ApprovalStep
 
 		title = "Issue approval needed"
@@ -295,12 +271,12 @@ func (m *Manager) getWebhookContextFromEvent(ctx context.Context, e *Event, acti
 	}
 
 	webhookCtx = webhook.Context{
-		Level:        level,
-		ActivityType: string(activityType),
-		Title:        title,
-		TitleZh:      titleZh,
-		Issue:        nil,
-		Rollout:      nil,
+		Level:     level,
+		EventType: string(eventType),
+		Title:     title,
+		TitleZh:   titleZh,
+		Issue:     nil,
+		Rollout:   nil,
 		Project: &webhook.Project{
 			Name:  common.FormatProject(e.Project.ResourceID),
 			Title: e.Project.Title,
@@ -370,7 +346,7 @@ func (m *Manager) postWebhookList(ctx context.Context, webhookCtx *webhook.Conte
 				slog.Warn("Failed to post webhook event on activity",
 					slog.String("webhook type", hook.Type),
 					slog.String("webhook name", hook.Title),
-					slog.String("activity type", webhookCtx.ActivityType),
+					slog.String("activity type", webhookCtx.EventType),
 					slog.String("title", webhookCtx.Title),
 					log.BBError(err))
 				return
@@ -445,9 +421,10 @@ func ChangeIssueStatus(ctx context.Context, stores *store.Store, webhookManager 
 		return errors.Wrapf(err, "failed to update issue %q's status", issue.Title)
 	}
 
+	// In the ChangeIssueStatus function
 	webhookManager.CreateEvent(ctx, &Event{
 		Actor:   updater,
-		Type:    EventTypeIssueStatusUpdate,
+		Type:    base.EventTypeIssueStatusUpdate,
 		Comment: comment,
 		Issue:   NewIssue(updatedIssue),
 		Project: NewProject(updatedIssue.Project),

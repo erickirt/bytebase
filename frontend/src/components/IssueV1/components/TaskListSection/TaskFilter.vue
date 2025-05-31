@@ -11,23 +11,26 @@
         class="bg-gray-50 pl-2 p-1 flex flex-row items-center rounded-full gap-1"
       >
         <span class="text-sm mr-1 text-gray-600">{{
-          $t("issue.sql-check.sql-checks")
+          isCreating ? $t("issue.sql-check.sql-checks") : $t("task.task-checks")
         }}</span>
         <template v-for="status in ADVICE_STATUS_FILTERS" :key="status">
           <NTag
             v-if="getTaskCount(undefined, status) > 0"
-            @click="
-              emit(
-                'update:adviceStatusList',
-                adviceStatusList.includes(status)
-                  ? adviceStatusList.filter((s) => s !== status)
-                  : [...adviceStatusList, status]
-              )
-            "
+            :disabled="disabled"
             :size="'small'"
             round
-            :bordered="adviceStatusList.includes(status)"
-            :type="adviceStatusList.includes(status) ? 'info' : 'default'"
+            checkable
+            :checked="adviceStatusList.includes(status)"
+            @update:checked="
+              (checked) => {
+                emit(
+                  'update:adviceStatusList',
+                  checked
+                    ? [...adviceStatusList, status]
+                    : adviceStatusList.filter((s) => s !== status)
+                );
+              }
+            "
           >
             <template #avatar>
               <AdviceStatusIcon :status="status" />
@@ -48,18 +51,21 @@
         <template v-for="status in TASK_STATUS_FILTERS" :key="status">
           <NTag
             v-if="getTaskCount(status) > 0"
-            @click="
-              emit(
-                'update:taskStatusList',
-                taskStatusList.includes(status)
-                  ? taskStatusList.filter((s) => s !== status)
-                  : [...taskStatusList, status]
-              )
-            "
+            :disabled="disabled"
             :size="'small'"
             round
-            :bordered="taskStatusList.includes(status)"
-            :type="taskStatusList.includes(status) ? 'info' : 'default'"
+            checkable
+            :checked="taskStatusList.includes(status)"
+            @update:checked="
+              (checked) => {
+                emit(
+                  'update:taskStatusList',
+                  checked
+                    ? [...taskStatusList, status]
+                    : taskStatusList.filter((s) => s !== status)
+                );
+              }
+            "
           >
             <template #avatar>
               <TaskStatusIconV1 :status="status" :size="'small'" />
@@ -75,15 +81,16 @@
 <script lang="ts" setup>
 import { NTag } from "naive-ui";
 import { computed } from "vue";
+import AdviceStatusIcon from "@/components/Plan/components/SQLCheckSection/AdviceStatusIcon.vue";
+import { usePlanSQLCheckContext } from "@/components/Plan/components/SQLCheckSection/context";
 import { Task_Status } from "@/types/proto/v1/rollout_service";
 import { Advice_Status } from "@/types/proto/v1/sql_service";
 import { useIssueContext } from "../../logic";
-import AdviceStatusIcon from "../SQLCheckSection/AdviceStatusIcon.vue";
-import { useIssueSQLCheckContext } from "../SQLCheckSection/context";
 import TaskStatusIconV1 from "../TaskStatusIconV1.vue";
 import { filterTask } from "./filter";
 
 defineProps<{
+  disabled: boolean;
   taskStatusList: Task_Status[];
   adviceStatusList: Advice_Status[];
 }>();
@@ -110,7 +117,7 @@ const ADVICE_STATUS_FILTERS: Advice_Status[] = [
 ];
 
 const issueContext = useIssueContext();
-const sqlCheckContext = useIssueSQLCheckContext();
+const { resultMap } = usePlanSQLCheckContext();
 
 const { isCreating, selectedStage } = issueContext;
 
@@ -118,7 +125,7 @@ const taskList = computed(() => selectedStage.value.tasks);
 
 const getTaskCount = (status?: Task_Status, adviceStatus?: Advice_Status) => {
   return taskList.value.filter((task) =>
-    filterTask(issueContext, sqlCheckContext, task, { status, adviceStatus })
+    filterTask(issueContext, resultMap.value, task, { status, adviceStatus })
   ).length;
 };
 </script>

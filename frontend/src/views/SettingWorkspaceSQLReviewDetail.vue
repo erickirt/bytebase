@@ -1,5 +1,5 @@
 <template>
-  <FeatureAttention custom-class="mb-4" feature="bb.feature.sql-review" />
+  <FeatureAttention class="mb-4" feature="bb.feature.sql-review" />
   <SQLReviewCreation
     v-if="state.editMode"
     key="sql-review-creation"
@@ -7,6 +7,7 @@
     :policy="reviewPolicy"
     :name="reviewPolicy.name"
     :selected-rule-list="ruleListOfPolicy"
+    :selected-resources="reviewPolicy.resources"
     @cancel="state.editMode = false"
   />
   <div v-else>

@@ -15,8 +15,8 @@
       placement="top"
     >
       <template #trigger>
-        <heroicons:exclamation-circle-solid
-          class="w-5 h-5 shrink-0"
+        <AlertCircleIcon
+          class="w-4 h-4 shrink-0"
           :class="[
             planCheckStatus === PlanCheckRun_Result_Status.ERROR
               ? 'text-error hover:text-error-hover'
@@ -32,44 +32,43 @@
     </NTooltip>
     <div
       v-if="isDatabaseChangeSpec(spec)"
-      class="flex items-center gap-2 truncate"
+      class="flex items-center gap-1 truncate"
     >
       <InstanceV1Name
-        :instance="databaseForSpec(plan, spec).instanceResource"
+        :instance="databaseForSpec(project, spec).instanceResource"
         :link="false"
         class="text-gray-500 text-sm"
       />
       <span class="truncate text-sm">{{
-        databaseForSpec(plan, spec).databaseName
+        databaseForSpec(project, spec).databaseName
       }}</span>
     </div>
-    <!-- Fallback to show the database group name if the spec is a grouping change spec in old plans. -->
     <div
       v-else-if="isGroupingChangeSpec(spec) && relatedDatabaseGroup"
       class="flex items-center gap-2 truncate"
     >
       <NTooltip>
-        <template #trigger><DatabaseGroupIcon class="w-4 h-auto" /></template>
-        {{ $t("resource.database-group") }}
+        <template #trigger>
+          <DatabaseGroupIcon class="w-4 h-auto" />
+        </template>
+        {{ $t("dynamic.resource.database-group") }}
       </NTooltip>
-      <span class="truncate text-sm">{{
-        relatedDatabaseGroup.databaseGroupName
-      }}</span>
+      <span class="truncate text-sm">{{ relatedDatabaseGroup.title }}</span>
     </div>
     <!-- Fallback -->
-    <div v-else class="flex items-center gap-2 text-sm">Unknown type</div>
+    <div v-else class="flex items-center gap-2 text-sm">Unknown target</div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { isEqual } from "lodash-es";
+import { head, isEqual } from "lodash-es";
+import { AlertCircleIcon } from "lucide-vue-next";
 import { NTooltip } from "naive-ui";
-import { computed, onMounted } from "vue";
+import { computed } from "vue";
 import DatabaseGroupIcon from "@/components/DatabaseGroupIcon.vue";
 import { planCheckRunSummaryForCheckRunList } from "@/components/PlanCheckRun/common";
 import { InstanceV1Name } from "@/components/v2";
-import { useDBGroupStore } from "@/store";
-import { DatabaseGroupView } from "@/types/proto/v1/database_group_service";
+import { useCurrentProjectV1, useDBGroupStore } from "@/store";
 import {
   PlanCheckRun_Result_Status,
   type Plan_Spec,
@@ -80,12 +79,14 @@ import {
   usePlanContext,
   isGroupingChangeSpec,
   planCheckRunListForSpec,
+  targetsForSpec,
 } from "../../logic";
 
 const props = defineProps<{
   spec: Plan_Spec;
 }>();
 
+const { project } = useCurrentProjectV1();
 const { isCreating, plan, selectedSpec, events } = usePlanContext();
 const dbGroupStore = useDBGroupStore();
 
@@ -113,12 +114,16 @@ const relatedDatabaseGroup = computed(() => {
   if (!isGroupingChangeSpec(props.spec)) {
     return undefined;
   }
-  return dbGroupStore.getDBGroupByName(props.spec.changeDatabaseConfig!.target);
+  const targets = targetsForSpec(props.spec);
+  const maybeDBGroupName = head(targets);
+  if (!maybeDBGroupName) {
+    return undefined;
+  }
+  return dbGroupStore.getDBGroupByName(maybeDBGroupName);
 });
 
 const planCheckStatus = computed((): PlanCheckRun_Result_Status => {
   if (isCreating.value) return PlanCheckRun_Result_Status.STATUS_UNSPECIFIED;
-
   const summary = planCheckRunSummaryForCheckRunList(
     planCheckRunListForSpec(plan.value, props.spec)
   );
@@ -129,18 +134,6 @@ const planCheckStatus = computed((): PlanCheckRun_Result_Status => {
     return PlanCheckRun_Result_Status.WARNING;
   }
   return PlanCheckRun_Result_Status.SUCCESS;
-});
-
-onMounted(async () => {
-  if (isGroupingChangeSpec(props.spec)) {
-    await dbGroupStore.getOrFetchDBGroupByName(
-      props.spec.changeDatabaseConfig!.target,
-      {
-        skipCache: true,
-        view: DatabaseGroupView.DATABASE_GROUP_VIEW_FULL,
-      }
-    );
-  }
 });
 
 const onClickSpec = (spec: Plan_Spec) => {

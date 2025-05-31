@@ -1,5 +1,5 @@
 <template>
-  <div class="-mx-4 h-full relative overflow-x-hidden">
+  <div class="-mx-4 relative overflow-x-hidden">
     <template v-if="ready">
       <GrantRequestIssueDetailPage v-if="isGrantRequestIssue(issue)" />
       <DataExportIssueDetailPage v-else-if="isDatabaseDataExportIssue(issue)" />
@@ -36,7 +36,7 @@ import {
   type PlanCheckRunEvents,
 } from "@/components/PlanCheckRun/context";
 import { useBodyLayoutContext } from "@/layouts/common";
-import { useUIStateStore } from "@/store";
+import { projectNamePrefix, useProjectByName, useUIStateStore } from "@/store";
 import {
   isGrantRequestIssue,
   isDatabaseDataExportIssue,
@@ -61,11 +61,14 @@ const { t } = useI18n();
 const state = reactive<LocalState>({
   showFeatureModal: false,
 });
+const { project, ready: projectReady } = useProjectByName(
+  computed(() => `${projectNamePrefix}${props.projectId}`)
+);
 
-const { isCreating, issue, isInitializing, reInitialize, allowEditIssue } =
-  useInitializeIssue(toRef(props, "issueSlug"), toRef(props, "projectId"));
+const { isCreating, issue, isInitializing, reInitialize, allowChange } =
+  useInitializeIssue(toRef(props, "issueSlug"), project);
 const ready = computed(() => {
-  return !isInitializing.value && !!issue.value;
+  return !isInitializing.value && !!issue.value && projectReady.value;
 });
 const uiStateStore = useUIStateStore();
 
@@ -81,7 +84,7 @@ provideIssueContext(
     issue,
     ready,
     reInitialize,
-    allowEditIssue,
+    allowChange,
     ...issueBaseContext,
   },
   true /* root */
