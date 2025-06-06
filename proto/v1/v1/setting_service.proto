@@ -106,6 +106,29 @@ message Setting {
     pattern: "settings/{setting}"
   };
 
+  enum SettingName {
+    SETTING_NAME_UNSPECIFIED = 0;
+    AUTH_SECRET = 1;
+    BRANDING_LOGO = 2;
+    WORKSPACE_ID = 3;
+    WORKSPACE_PROFILE = 4;
+    WORKSPACE_APPROVAL = 5;
+    WORKSPACE_EXTERNAL_APPROVAL = 6;
+    ENTERPRISE_LICENSE = 7;
+    APP_IM = 8;
+    WATERMARK = 9;
+    AI = 10;
+    PLUGIN_AGENT = 11;
+    WORKSPACE_MAIL_DELIVERY = 12;
+    SCHEMA_TEMPLATE = 13;
+    DATA_CLASSIFICATION = 14;
+    SEMANTIC_TYPES = 15;
+    SQL_RESULT_SIZE_LIMIT = 16;
+    SCIM = 17;
+    PASSWORD_RESTRICTION = 18;
+    ENVIRONMENT = 19;
+  }
+
   // The resource name of the setting. Must be one of the following forms:
   //
   // - `setting/{setting}`
@@ -283,6 +306,15 @@ message Announcement {
 message WorkspaceApprovalSetting {
   message Rule {
     ApprovalTemplate template = 2;
+    // The condition that is associated with the rule.
+    // The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+    //
+    // Support variables:
+    // source: the risk source, check the Source enum in the Risk message for the values, support "==" operator.
+    // level: the risk level, support 100 (low), 200 (moderate) and 300 (high), support "==" operator.
+    //
+    // For examples:
+    // (source == "DML" && level == 200) || (source == "DDL" && level == 300)
     google.type.Expr condition = 3;
   }
   repeated Rule rules = 1;

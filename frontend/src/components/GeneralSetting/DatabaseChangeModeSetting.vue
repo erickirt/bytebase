@@ -1,5 +1,5 @@
 <template>
-  <div ref="containerRef" class="pb-6 lg:flex">
+  <div class="pb-6 lg:flex">
     <div class="text-left lg:w-1/4">
       <div class="flex items-center space-x-2">
         <h1 class="text-2xl font-bold">
@@ -8,59 +8,10 @@
       </div>
     </div>
     <div class="flex-1 mt-4 lg:px-4 lg:mt-0">
-      <p class="mt-0.5 mb-2 font-medium">
-        {{ $t("settings.general.workspace.database-change-mode.description") }}
-        <LearnMoreLink
-          url="https://www.bytebase.com/docs/administration/mode?source=console"
-          class="ml-1 text-sm"
-        />
-      </p>
-      <div>
-        <NRadioGroup
-          v-model:value="state.databaseChangeMode"
-          :disabled="!allowEdit"
-          size="large"
-        >
-          <NSpace vertical>
-            <NRadio key="PIPELINE" :value="DatabaseChangeMode.PIPELINE">
-              <div class="flex flex-col gap-1">
-                <div class="text-medium">
-                  {{
-                    $t(
-                      "settings.general.workspace.database-change-mode.issue-mode.self"
-                    )
-                  }}
-                </div>
-                <div class="textinfolabel">
-                  {{
-                    $t(
-                      "settings.general.workspace.database-change-mode.issue-mode.description"
-                    )
-                  }}
-                </div>
-              </div>
-            </NRadio>
-            <NRadio key="EDITOR" :value="DatabaseChangeMode.EDITOR">
-              <div class="flex flex-col gap-1">
-                <div class="text-medium">
-                  {{
-                    $t(
-                      "settings.general.workspace.database-change-mode.sql-editor-mode.self"
-                    )
-                  }}
-                </div>
-                <div class="textinfolabel">
-                  {{
-                    $t(
-                      "settings.general.workspace.database-change-mode.sql-editor-mode.description"
-                    )
-                  }}
-                </div>
-              </div>
-            </NRadio>
-          </NSpace>
-        </NRadioGroup>
-      </div>
+      <WorkspaceMode
+        v-model:mode="state.databaseChangeMode"
+        :disabled="!allowEdit"
+      />
     </div>
 
     <BBModal
@@ -92,16 +43,16 @@
 </template>
 
 <script lang="ts" setup>
-import { NRadioGroup, NSpace, NRadio, NButton } from "naive-ui";
-import { computed, reactive, ref } from "vue";
+import { NButton } from "naive-ui";
+import { computed, reactive } from "vue";
 import { BBModal } from "@/bbkit";
-import LearnMoreLink from "@/components/LearnMoreLink.vue";
 import { router } from "@/router";
 import { WORKSPACE_ROUTE_LANDING } from "@/router/dashboard/workspaceRoutes";
 import { SQL_EDITOR_HOME_MODULE } from "@/router/sqlEditor";
 import { useSettingV1Store } from "@/store/modules/v1/setting";
 import { DatabaseChangeMode } from "@/types/proto/v1/setting_service";
 import { isSQLEditorRoute } from "@/utils";
+import WorkspaceMode from "@/views/Setup/WorkspaceMode.vue";
 
 interface LocalState {
   databaseChangeMode: DatabaseChangeMode;
@@ -131,7 +82,6 @@ const props = defineProps<{
 }>();
 
 const settingV1Store = useSettingV1Store();
-const containerRef = ref<HTMLDivElement>();
 
 const state = reactive<LocalState>(getInitialState());
 

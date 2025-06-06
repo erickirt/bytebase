@@ -1,10 +1,8 @@
 import dayjs from "dayjs";
-import { orderBy } from "lodash-es";
+import { orderBy, uniq } from "lodash-es";
 import { defineStore } from "pinia";
 import { planServiceClient } from "@/grpcweb";
-import { useUserStore } from "@/store";
 import { EMPTY_ID, UNKNOWN_ID } from "@/types";
-import { unknownUser } from "@/types";
 import type { Plan } from "@/types/proto/v1/plan_service";
 import {
   emptyPlan,
@@ -18,7 +16,7 @@ import {
   hasProjectPermissionV2,
   type SearchParams,
 } from "@/utils";
-import { batchGetOrFetchDatabases } from "./database";
+import { useUserStore } from "../user";
 import { useProjectV1Store } from "./project";
 
 export interface PlanFind {
@@ -33,7 +31,7 @@ export interface PlanFind {
 export const buildPlanFilter = (find: PlanFind): string => {
   const filter: string[] = [];
   if (find.creator) {
-    filter.push(`creator = "${find.creator}"`);
+    filter.push(`creator == "${find.creator}"`);
   }
   if (find.createdTsAfter) {
     filter.push(
@@ -46,10 +44,10 @@ export const buildPlanFilter = (find: PlanFind): string => {
     );
   }
   if (find.hasIssue !== undefined) {
-    filter.push(`has_issue = "${find.hasIssue}"`);
+    filter.push(`has_issue == ${find.hasIssue}`);
   }
   if (find.hasPipeline !== undefined) {
-    filter.push(`has_pipeline = "${find.hasPipeline}"`);
+    filter.push(`has_pipeline == ${find.hasPipeline}`);
   }
   return filter.join(" && ");
 };
@@ -74,39 +72,22 @@ export const buildPlanFindBySearchParams = (
 };
 
 export const composePlan = async (rawPlan: Plan): Promise<ComposedPlan> => {
-  const userStore = useUserStore();
   const project = `projects/${extractProjectResourceName(rawPlan.name)}`;
   const projectEntity =
     await useProjectV1Store().getOrFetchProjectByName(project);
-
-  const creatorEntity =
-    (await userStore.getOrFetchUserByIdentifier(rawPlan.creator)) ??
-    unknownUser();
 
   const plan: ComposedPlan = {
     ...rawPlan,
     planCheckRunList: [],
     project,
-    projectEntity,
-    creatorEntity,
   };
-
-  await batchGetOrFetchDatabases(
-    plan.steps
-      .flatMap((step) => step.specs)
-      .flatMap((spec) => spec.changeDatabaseConfig?.target ?? "")
-  );
-
   if (hasProjectPermissionV2(projectEntity, "bb.planCheckRuns.list")) {
-    // Only show the latest plan check runs.
-    // TODO(steven): maybe we need to show all plan check runs on a separate page later.
     const { planCheckRuns } = await planServiceClient.listPlanCheckRuns({
       parent: rawPlan.name,
       latestOnly: true,
     });
     plan.planCheckRunList = orderBy(planCheckRuns, "name", "desc");
   }
-
   return plan;
 };
 
@@ -127,6 +108,9 @@ export const usePlanStore = defineStore("plan", () => {
     const composedPlans = await Promise.all(
       resp.plans.map((plan) => composePlan(plan))
     );
+    // Preprare creator for the plans.
+    const users = uniq(composedPlans.map((plan) => plan.creator));
+    await useUserStore().batchGetUsers(users);
     return {
       nextPageToken: resp.nextPageToken,
       plans: composedPlans,

@@ -11,7 +11,8 @@
         <template
           v-if="
             database &&
-            formatEnvironmentName(instanceEnvironment.id) !== database.effectiveEnvironment
+            formatEnvironmentName(instanceEnvironment.id) !==
+              database.effectiveEnvironment
           "
           #prefix
         >
@@ -78,14 +79,23 @@
 import { computedAsync } from "@vueuse/core";
 import { ChevronRightIcon, DatabaseIcon } from "lucide-vue-next";
 import { computed } from "vue";
-import { databaseForTask, useIssueContext } from "@/components/IssueV1/logic";
+import { useIssueContext } from "@/components/IssueV1/logic";
+import { databaseForTask } from "@/components/Rollout/RolloutDetail";
 import {
   DatabaseV1Name,
   EnvironmentV1Name,
   InstanceV1Name,
 } from "@/components/v2";
-import { useDatabaseV1Store, useEnvironmentV1Store } from "@/store";
-import { formatEnvironmentName, isValidDatabaseName, unknownEnvironment } from "@/types";
+import {
+  useDatabaseV1Store,
+  useEnvironmentV1Store,
+  useCurrentProjectV1,
+} from "@/store";
+import {
+  formatEnvironmentName,
+  isValidDatabaseName,
+  unknownEnvironment,
+} from "@/types";
 import { Task_Status, Task_Type } from "@/types/proto/v1/rollout_service";
 import { extractInstanceResourceName } from "@/utils";
 
@@ -100,10 +110,11 @@ withDefaults(
   }
 );
 
-const { issue, selectedTask } = useIssueContext();
+const { selectedTask } = useIssueContext();
+const { project } = useCurrentProjectV1();
 
 const coreDatabaseInfo = computed(() => {
-  return databaseForTask(issue.value, selectedTask.value);
+  return databaseForTask(project.value, selectedTask.value);
 });
 
 const databaseCreationStatus = computed((): DatabaseCreationStatus => {

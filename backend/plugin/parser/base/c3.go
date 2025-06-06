@@ -1,10 +1,13 @@
 package base
 
 import (
+	"context"
 	"sync"
 
 	"github.com/antlr4-go/antlr/v4"
 )
+
+const maxRecursionDepth = 66
 
 // CodeCompletionCore is the core of code completion.
 // It only relies on the ANTLR runtime and does not depend on any specific language.
@@ -34,6 +37,9 @@ type CodeCompletionCore struct {
 	callStack                  *RuleList
 	lastQueryRuleContext       *RuleContext
 	lastShadowQueryRuleContext *RuleContext
+
+	// Context for cancellation support
+	ctx context.Context
 }
 
 type Token struct {
@@ -43,6 +49,7 @@ type Token struct {
 
 // NewCodeCompletionCore creates a new CodeCompletionCore.
 func NewCodeCompletionCore(
+	ctx context.Context,
 	parser antlr.Parser,
 	ignoredTokens,
 	preferredRules map[int]bool,
@@ -62,6 +69,7 @@ func NewCodeCompletionCore(
 		parser:              parser,
 		atn:                 parser.GetATN(),
 		followSetsByState:   followSets,
+		ctx:                 ctx,
 	}
 }
 
@@ -392,6 +400,16 @@ func (c *CodeCompletionCore) CollectCandidates(caretTokenIndex int, context antl
 }
 
 func (c *CodeCompletionCore) fetchEndStatus(startState antlr.ATNState, tokenIndex int, indentation string) RuleEndStatus {
+	// Check for context cancellation
+	select {
+	case <-c.ctx.Done():
+		return RuleEndStatus{}
+	default:
+	}
+
+	if len(c.callStack.rules) > maxRecursionDepth {
+		return RuleEndStatus{}
+	}
 	result := make(RuleEndStatus)
 	c.followSetsByState.CollectFollowSets(c.parser, startState, c.IgnoredTokens, c.PreferredRules)
 
@@ -471,6 +489,14 @@ func (c *CodeCompletionCore) fetchEndStatus(startState antlr.ATNState, tokenInde
 	})
 
 	for len(statePipeline) != 0 {
+		// Check for context cancellation in the main loop
+		select {
+		case <-c.ctx.Done():
+			c.callStack.Pop()
+			return RuleEndStatus{}
+		default:
+		}
+
 		currentEntry = statePipeline[len(statePipeline)-1]
 		statePipeline = statePipeline[:len(statePipeline)-1]
 		c.statesProcessed++

@@ -19,7 +19,6 @@ import (
 	tidbast "github.com/pingcap/tidb/pkg/parser/ast"
 
 	"github.com/bytebase/bytebase/backend/common"
-	"github.com/bytebase/bytebase/backend/plugin/db/mssql"
 	"github.com/bytebase/bytebase/backend/plugin/parser/base"
 	crparser "github.com/bytebase/bytebase/backend/plugin/parser/cockroachdb"
 	mysqlparser "github.com/bytebase/bytebase/backend/plugin/parser/mysql"
@@ -72,7 +71,7 @@ func (sm *Manager) CreateSheet(ctx context.Context, sheet *store.SheetMessage) (
 	return sm.store.CreateSheet(ctx, sheet)
 }
 
-func (sm *Manager) BatchCreateSheet(ctx context.Context, sheets []*store.SheetMessage, projectID string, creatorUID int) ([]*store.SheetMessage, error) {
+func (sm *Manager) BatchCreateSheets(ctx context.Context, sheets []*store.SheetMessage, projectID string, creatorUID int) ([]*store.SheetMessage, error) {
 	for _, sheet := range sheets {
 		if sheet.Payload == nil {
 			sheet.Payload = &storepb.SheetPayload{}
@@ -155,17 +154,17 @@ func getSheetCommandsFromByteOffset(engine storepb.Engine, statement string) []*
 
 func getSheetCommandsForMSSQL(statement string) []*storepb.SheetCommand {
 	var sheetCommands []*storepb.SheetCommand
-	p := 0
 
-	batch := mssql.NewBatch(statement)
+	batch := tsqlbatch.NewBatcher(statement)
 	for {
 		command, err := batch.Next()
 		if err == io.EOF {
-			np := p + len(batch.String())
+			b := batch.Batch()
 			sheetCommands = append(sheetCommands, &storepb.SheetCommand{
-				Start: int32(p),
-				End:   int32(np),
+				Start: int32(b.Start),
+				End:   int32(b.End),
 			})
+			batch.Reset(nil)
 			break
 		}
 		if err != nil {
@@ -177,12 +176,12 @@ func getSheetCommandsForMSSQL(statement string) []*storepb.SheetCommand {
 		}
 		switch command.(type) {
 		case *tsqlbatch.GoCommand:
-			np := p + len(batch.String())
+			b := batch.Batch()
 			sheetCommands = append(sheetCommands, &storepb.SheetCommand{
-				Start: int32(p),
-				End:   int32(np),
+				Start: int32(b.Start),
+				End:   int32(b.End),
 			})
-			p = np
+			batch.Reset(nil)
 		default:
 		}
 		if len(sheetCommands) > common.MaximumCommands {
@@ -437,7 +436,7 @@ func calculatePostgresErrorLine(statement string) int {
 
 	for _, singleSQL := range singleSQLs {
 		if _, err := pgrawparser.Parse(pgrawparser.ParseContext{}, singleSQL.Text); err != nil {
-			return singleSQL.LastLine + 1
+			return int(singleSQL.End.GetLine()) + 1
 		}
 	}
 
@@ -540,7 +539,7 @@ func tidbSyntaxCheck(statement string) (any, []*storepb.Advice) {
 
 		node := nodes[0]
 		node.SetText(nil, singleSQL.Text)
-		node.SetOriginTextPosition(singleSQL.LastLine)
+		node.SetOriginTextPosition(int(singleSQL.End.GetLine()))
 		if n, ok := node.(*tidbast.CreateTableStmt); ok {
 			if err := tidbbbparser.SetLineForMySQLCreateTableStmt(n); err != nil {
 				return nil, append(adviceList, &storepb.Advice{
@@ -549,13 +548,13 @@ func tidbSyntaxCheck(statement string) (any, []*storepb.Advice) {
 					Title:   "Set line error",
 					Content: err.Error(),
 					StartPosition: &storepb.Position{
-						Line: int32(singleSQL.LastLine),
+						Line: singleSQL.End.GetLine(),
 					},
 				})
 			}
 		}
 		returnNodes = append(returnNodes, node)
-		baseLine = singleSQL.LastLine
+		baseLine = int(singleSQL.End.GetLine())
 	}
 
 	return returnNodes, adviceList

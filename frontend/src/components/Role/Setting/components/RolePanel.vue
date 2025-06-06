@@ -86,7 +86,7 @@
           <NButton type="primary" :disabled="!allowSave" @click="handleSave">
             <FeatureBadge
               feature="bb.feature.custom-role"
-              custom-class="mr-1 text-white"
+              class="mr-1 text-white"
             />
             {{ mode === "ADD" ? $t("common.add") : $t("common.update") }}
           </NButton>
@@ -143,7 +143,7 @@ const roleStore = useRoleStore();
 const { hasCustomRoleFeature, showFeatureModal } =
   useCustomRoleSettingContext();
 const state = reactive<LocalState>({
-  role: Role.fromJSON({}),
+  role: Role.fromPartial({}),
   dirty: false,
   loading: false,
   showImportPermissionFromRoleModal: false,

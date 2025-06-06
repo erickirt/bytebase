@@ -1,19 +1,15 @@
 <template>
-  <div class="h-full flex flex-col">
+  <div ref="containerRef" class="h-full flex flex-col">
     <div class="border-b">
       <HeaderSection />
     </div>
-    <div class="flex-1 flex flex-row">
+    <div class="w-full flex-1 flex flex-row">
+      <Navigator />
       <div
         class="flex-1 flex flex-col hide-scrollbar divide-y overflow-x-hidden"
       >
-        <SpecListSection />
-
-        <SQLCheckSection v-if="isCreating" @update:advices="advices = $event" />
-        <PlanCheckSection v-if="!isCreating" />
-
-        <StatementSection :advices="advices" />
-        <DescriptionSection />
+        <Overview v-if="!selectedSpec" />
+        <SpecDetailView v-else :key="selectedSpec.id" />
       </div>
     </div>
   </div>
@@ -21,22 +17,16 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import type { Advice } from "@/types/proto/v1/sql_service";
-import { provideSQLCheckContext } from "../SQLCheck";
 import {
   HeaderSection,
-  PlanCheckSection,
-  StatementSection,
-  DescriptionSection,
-  SQLCheckSection,
-  SpecListSection,
+  Navigator,
+  Overview,
+  SpecDetailView,
 } from "./components";
 import { usePlanContext, usePollPlan } from "./logic";
 
-const { isCreating } = usePlanContext();
-const advices = ref<Advice[]>();
+const { selectedSpec } = usePlanContext();
+const containerRef = ref<HTMLElement>();
 
 usePollPlan();
-
-provideSQLCheckContext();
 </script>

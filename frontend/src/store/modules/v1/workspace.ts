@@ -3,13 +3,9 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { workspaceServiceClient } from "@/grpcweb";
 import { userNamePrefix } from "@/store/modules/v1/common";
-import {
-  groupBindingPrefix,
-  PresetRoleType,
-  ALL_USERS_USER_EMAIL,
-} from "@/types";
+import { groupBindingPrefix, ALL_USERS_USER_EMAIL } from "@/types";
 import { IamPolicy, Binding } from "@/types/proto/v1/iam_policy";
-import { roleListInIAM, getUserEmailListInBinding } from "@/utils";
+import { bindingListInIAM, getUserEmailListInBinding } from "@/utils";
 import { extractUserId } from "./common";
 import { extractGroupEmail } from "./group";
 
@@ -137,18 +133,17 @@ export const useWorkspaceV1Store = defineStore("workspace_v1", () => {
     } else {
       email = extractUserId(member);
     }
-    return roleListInIAM({
+    return bindingListInIAM({
       policy: workspaceIamPolicy.value,
       email,
       ignoreGroup,
-    });
+    }).map((binding) => binding.role);
   };
 
   const getWorkspaceRolesByEmail = (email: string) => {
     const specificRoles =
       userMapToRoles.value.get(`${userNamePrefix}${email}`) ??
-      // TODO(ed): not default member role
-      new Set<string>([PresetRoleType.WORKSPACE_MEMBER]);
+      new Set<string>([]);
     if (userMapToRoles.value.has(`${userNamePrefix}${ALL_USERS_USER_EMAIL}`)) {
       for (const role of userMapToRoles.value.get(
         `${userNamePrefix}${ALL_USERS_USER_EMAIL}`

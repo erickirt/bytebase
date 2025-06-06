@@ -95,6 +95,8 @@ export interface ListDatabaseGroupsRequest {
    * the call that provided the page token.
    */
   pageToken: string;
+  /** The view to return. Defaults to DATABASE_GROUP_VIEW_BASIC. */
+  view: DatabaseGroupView;
 }
 
 export interface ListDatabaseGroupsResponse {
@@ -167,12 +169,21 @@ export interface DatabaseGroup {
    * Format: projects/{project}/databaseGroups/{databaseGroup}
    */
   name: string;
+  /** The short name used in actual databases specified by users. */
+  title: string;
   /**
-   * The short name used in actual databases specified by users.
-   * For example, the placeholder for db1_2010, db1_2021, db1_2023 will be "db1".
+   * The condition that is associated with this database group.
+   * The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+   *
+   * Support variables:
+   * resource.environment_name: the environment resource id. Support "==", "!=", "in [XX]", "!(in [xx])" operations.
+   * resource.instance_id: the instance resource id. Support "==", "!=", "in [XX]", "!(in [xx])", "contains", "matches", "startsWith", "endsWith" operations.
+   * resource.database_name: the database name. Support "==", "!=", "in [XX]", "!(in [xx])", "contains", "matches", "startsWith", "endsWith" operations.
+   * All variables should join with "&&" condition.
+   *
+   * For example:
+   * resource.environment_name == "test" && resource.database_name.startsWith("sample_")
    */
-  databasePlaceholder: string;
-  /** The condition that is associated with this database group. */
   databaseExpr:
     | Expr
     | undefined;
@@ -191,7 +202,7 @@ export interface DatabaseGroup_Database {
 }
 
 function createBaseListDatabaseGroupsRequest(): ListDatabaseGroupsRequest {
-  return { parent: "", pageSize: 0, pageToken: "" };
+  return { parent: "", pageSize: 0, pageToken: "", view: DatabaseGroupView.DATABASE_GROUP_VIEW_UNSPECIFIED };
 }
 
 export const ListDatabaseGroupsRequest: MessageFns<ListDatabaseGroupsRequest> = {
@@ -204,6 +215,9 @@ export const ListDatabaseGroupsRequest: MessageFns<ListDatabaseGroupsRequest> = 
     }
     if (message.pageToken !== "") {
       writer.uint32(26).string(message.pageToken);
+    }
+    if (message.view !== DatabaseGroupView.DATABASE_GROUP_VIEW_UNSPECIFIED) {
+      writer.uint32(32).int32(databaseGroupViewToNumber(message.view));
     }
     return writer;
   },
@@ -239,6 +253,14 @@ export const ListDatabaseGroupsRequest: MessageFns<ListDatabaseGroupsRequest> = 
           message.pageToken = reader.string();
           continue;
         }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.view = databaseGroupViewFromJSON(reader.int32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -246,14 +268,6 @@ export const ListDatabaseGroupsRequest: MessageFns<ListDatabaseGroupsRequest> = 
       reader.skip(tag & 7);
     }
     return message;
-  },
-
-  fromJSON(object: any): ListDatabaseGroupsRequest {
-    return {
-      parent: isSet(object.parent) ? globalThis.String(object.parent) : "",
-      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
-      pageToken: isSet(object.pageToken) ? globalThis.String(object.pageToken) : "",
-    };
   },
 
   toJSON(message: ListDatabaseGroupsRequest): unknown {
@@ -267,6 +281,9 @@ export const ListDatabaseGroupsRequest: MessageFns<ListDatabaseGroupsRequest> = 
     if (message.pageToken !== "") {
       obj.pageToken = message.pageToken;
     }
+    if (message.view !== DatabaseGroupView.DATABASE_GROUP_VIEW_UNSPECIFIED) {
+      obj.view = databaseGroupViewToJSON(message.view);
+    }
     return obj;
   },
 
@@ -278,6 +295,7 @@ export const ListDatabaseGroupsRequest: MessageFns<ListDatabaseGroupsRequest> = 
     message.parent = object.parent ?? "";
     message.pageSize = object.pageSize ?? 0;
     message.pageToken = object.pageToken ?? "";
+    message.view = object.view ?? DatabaseGroupView.DATABASE_GROUP_VIEW_UNSPECIFIED;
     return message;
   },
 };
@@ -327,15 +345,6 @@ export const ListDatabaseGroupsResponse: MessageFns<ListDatabaseGroupsResponse> 
       reader.skip(tag & 7);
     }
     return message;
-  },
-
-  fromJSON(object: any): ListDatabaseGroupsResponse {
-    return {
-      databaseGroups: globalThis.Array.isArray(object?.databaseGroups)
-        ? object.databaseGroups.map((e: any) => DatabaseGroup.fromJSON(e))
-        : [],
-      nextPageToken: isSet(object.nextPageToken) ? globalThis.String(object.nextPageToken) : "",
-    };
   },
 
   toJSON(message: ListDatabaseGroupsResponse): unknown {
@@ -405,15 +414,6 @@ export const GetDatabaseGroupRequest: MessageFns<GetDatabaseGroupRequest> = {
       reader.skip(tag & 7);
     }
     return message;
-  },
-
-  fromJSON(object: any): GetDatabaseGroupRequest {
-    return {
-      name: isSet(object.name) ? globalThis.String(object.name) : "",
-      view: isSet(object.view)
-        ? databaseGroupViewFromJSON(object.view)
-        : DatabaseGroupView.DATABASE_GROUP_VIEW_UNSPECIFIED,
-    };
   },
 
   toJSON(message: GetDatabaseGroupRequest): unknown {
@@ -507,15 +507,6 @@ export const CreateDatabaseGroupRequest: MessageFns<CreateDatabaseGroupRequest> 
     return message;
   },
 
-  fromJSON(object: any): CreateDatabaseGroupRequest {
-    return {
-      parent: isSet(object.parent) ? globalThis.String(object.parent) : "",
-      databaseGroup: isSet(object.databaseGroup) ? DatabaseGroup.fromJSON(object.databaseGroup) : undefined,
-      databaseGroupId: isSet(object.databaseGroupId) ? globalThis.String(object.databaseGroupId) : "",
-      validateOnly: isSet(object.validateOnly) ? globalThis.Boolean(object.validateOnly) : false,
-    };
-  },
-
   toJSON(message: CreateDatabaseGroupRequest): unknown {
     const obj: any = {};
     if (message.parent !== "") {
@@ -595,13 +586,6 @@ export const UpdateDatabaseGroupRequest: MessageFns<UpdateDatabaseGroupRequest> 
     return message;
   },
 
-  fromJSON(object: any): UpdateDatabaseGroupRequest {
-    return {
-      databaseGroup: isSet(object.databaseGroup) ? DatabaseGroup.fromJSON(object.databaseGroup) : undefined,
-      updateMask: isSet(object.updateMask) ? FieldMask.unwrap(FieldMask.fromJSON(object.updateMask)) : undefined,
-    };
-  },
-
   toJSON(message: UpdateDatabaseGroupRequest): unknown {
     const obj: any = {};
     if (message.databaseGroup !== undefined) {
@@ -662,10 +646,6 @@ export const DeleteDatabaseGroupRequest: MessageFns<DeleteDatabaseGroupRequest> 
     return message;
   },
 
-  fromJSON(object: any): DeleteDatabaseGroupRequest {
-    return { name: isSet(object.name) ? globalThis.String(object.name) : "" };
-  },
-
   toJSON(message: DeleteDatabaseGroupRequest): unknown {
     const obj: any = {};
     if (message.name !== "") {
@@ -685,7 +665,7 @@ export const DeleteDatabaseGroupRequest: MessageFns<DeleteDatabaseGroupRequest> 
 };
 
 function createBaseDatabaseGroup(): DatabaseGroup {
-  return { name: "", databasePlaceholder: "", databaseExpr: undefined, matchedDatabases: [], unmatchedDatabases: [] };
+  return { name: "", title: "", databaseExpr: undefined, matchedDatabases: [], unmatchedDatabases: [] };
 }
 
 export const DatabaseGroup: MessageFns<DatabaseGroup> = {
@@ -693,8 +673,8 @@ export const DatabaseGroup: MessageFns<DatabaseGroup> = {
     if (message.name !== "") {
       writer.uint32(10).string(message.name);
     }
-    if (message.databasePlaceholder !== "") {
-      writer.uint32(18).string(message.databasePlaceholder);
+    if (message.title !== "") {
+      writer.uint32(18).string(message.title);
     }
     if (message.databaseExpr !== undefined) {
       Expr.encode(message.databaseExpr, writer.uint32(26).fork()).join();
@@ -728,7 +708,7 @@ export const DatabaseGroup: MessageFns<DatabaseGroup> = {
             break;
           }
 
-          message.databasePlaceholder = reader.string();
+          message.title = reader.string();
           continue;
         }
         case 3: {
@@ -764,27 +744,13 @@ export const DatabaseGroup: MessageFns<DatabaseGroup> = {
     return message;
   },
 
-  fromJSON(object: any): DatabaseGroup {
-    return {
-      name: isSet(object.name) ? globalThis.String(object.name) : "",
-      databasePlaceholder: isSet(object.databasePlaceholder) ? globalThis.String(object.databasePlaceholder) : "",
-      databaseExpr: isSet(object.databaseExpr) ? Expr.fromJSON(object.databaseExpr) : undefined,
-      matchedDatabases: globalThis.Array.isArray(object?.matchedDatabases)
-        ? object.matchedDatabases.map((e: any) => DatabaseGroup_Database.fromJSON(e))
-        : [],
-      unmatchedDatabases: globalThis.Array.isArray(object?.unmatchedDatabases)
-        ? object.unmatchedDatabases.map((e: any) => DatabaseGroup_Database.fromJSON(e))
-        : [],
-    };
-  },
-
   toJSON(message: DatabaseGroup): unknown {
     const obj: any = {};
     if (message.name !== "") {
       obj.name = message.name;
     }
-    if (message.databasePlaceholder !== "") {
-      obj.databasePlaceholder = message.databasePlaceholder;
+    if (message.title !== "") {
+      obj.title = message.title;
     }
     if (message.databaseExpr !== undefined) {
       obj.databaseExpr = Expr.toJSON(message.databaseExpr);
@@ -804,7 +770,7 @@ export const DatabaseGroup: MessageFns<DatabaseGroup> = {
   fromPartial(object: DeepPartial<DatabaseGroup>): DatabaseGroup {
     const message = createBaseDatabaseGroup();
     message.name = object.name ?? "";
-    message.databasePlaceholder = object.databasePlaceholder ?? "";
+    message.title = object.title ?? "";
     message.databaseExpr = (object.databaseExpr !== undefined && object.databaseExpr !== null)
       ? Expr.fromPartial(object.databaseExpr)
       : undefined;
@@ -848,10 +814,6 @@ export const DatabaseGroup_Database: MessageFns<DatabaseGroup_Database> = {
       reader.skip(tag & 7);
     }
     return message;
-  },
-
-  fromJSON(object: any): DatabaseGroup_Database {
-    return { name: isSet(object.name) ? globalThis.String(object.name) : "" };
   },
 
   toJSON(message: DatabaseGroup_Database): unknown {
@@ -1293,14 +1255,9 @@ export type DeepPartial<T> = T extends Builtin ? T
   : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
   : Partial<T>;
 
-function isSet(value: any): boolean {
-  return value !== null && value !== undefined;
-}
-
 export interface MessageFns<T> {
   encode(message: T, writer?: BinaryWriter): BinaryWriter;
   decode(input: BinaryReader | Uint8Array, length?: number): T;
-  fromJSON(object: any): T;
   toJSON(message: T): unknown;
   create(base?: DeepPartial<T>): T;
   fromPartial(object: DeepPartial<T>): T;

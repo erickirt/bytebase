@@ -1,37 +1,41 @@
 <template>
-  <div
-    v-bind="$attrs"
-    class="text-sm flex flex-col lg:flex-row items-start lg:items-center bg-blue-100 py-3 px-4 text-main gap-y-2 gap-x-4 overflow-x-auto"
-  >
-    {{
-      $t("database.selected-n-databases", {
-        n: databases.length,
-      })
-    }}
-    <div class="flex items-center">
-      <template v-for="action in actions" :key="action.text">
-        <NTooltip :disabled="!action.disabled || !action.tooltip(action.text)">
-          <template #trigger>
-            <NButton
-              quaternary
-              size="small"
-              type="primary"
-              :disabled="action.disabled"
-              @click="action.click"
-            >
-              <template #icon>
-                <component :is="action.icon" class="h-4 w-4" />
-              </template>
-              <span class="text-sm">{{ action.text }}</span>
-            </NButton>
-          </template>
-          <span class="w-56 text-sm">
-            {{ action.tooltip(action.text.toLowerCase()) }}
-          </span>
-        </NTooltip>
-      </template>
+  <NScrollbar x-scrollable>
+    <div
+      v-bind="$attrs"
+      class="text-sm flex flex-col lg:flex-row items-start lg:items-center bg-blue-100 py-3 px-4 text-main gap-y-2 gap-x-4"
+    >
+      <span class="whitespace-nowrap">{{
+        $t("database.selected-n-databases", {
+          n: databases.length,
+        })
+      }}</span>
+      <div class="flex items-center">
+        <template v-for="action in actions" :key="action.text">
+          <NTooltip
+            :disabled="!action.disabled || !action.tooltip(action.text)"
+          >
+            <template #trigger>
+              <NButton
+                quaternary
+                size="small"
+                type="primary"
+                :disabled="action.disabled"
+                @click="action.click"
+              >
+                <template #icon>
+                  <component :is="action.icon" class="h-4 w-4" />
+                </template>
+                <span class="text-sm">{{ action.text }}</span>
+              </NButton>
+            </template>
+            <span class="w-56 text-sm">
+              {{ action.tooltip(action.text.toLowerCase()) }}
+            </span>
+          </NTooltip>
+        </template>
+      </div>
     </div>
-  </div>
+  </NScrollbar>
 
   <SchemaEditorModal
     v-if="state.showSchemaEditorModal"
@@ -53,9 +57,8 @@
     @apply="onLabelsApply($event)"
   />
 
-  <DatabaseEditEnvironmentDrawer
+  <EditEnvironmentDrawer
     :show="state.showEditEnvironmentDrawer"
-    :databases="databases"
     @dismiss="state.showEditEnvironmentDrawer = false"
     @update="onEnvironmentUpdate($event)"
   />
@@ -109,14 +112,14 @@ import {
   ChevronsDownIcon,
   SquareStackIcon,
 } from "lucide-vue-next";
-import { NButton, NTooltip, useDialog } from "naive-ui";
+import { NButton, NTooltip, useDialog, NScrollbar } from "naive-ui";
 import type { VNode } from "vue";
 import { computed, h, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { BBAlert } from "@/bbkit";
 import SchemaEditorModal from "@/components/AlterSchemaPrepForm/SchemaEditorModal.vue";
-import DatabaseEditEnvironmentDrawer from "@/components/DatabaseEditEnvironmentDrawer.vue";
+import EditEnvironmentDrawer from "@/components/EditEnvironmentDrawer.vue";
 import LabelEditorDrawer from "@/components/LabelEditorDrawer.vue";
 import { TransferDatabaseForm } from "@/components/TransferDatabaseForm";
 import TransferOutDatabaseForm from "@/components/TransferOutDatabaseForm";
@@ -183,7 +186,7 @@ const state = reactive<LocalState>({
 
 const emit = defineEmits<{
   (event: "refresh"): void;
-  (event: "update-cache", databases: ComposedDatabase[]): void;
+  (event: "update", databases: ComposedDatabase[]): void;
 }>();
 
 const { t } = useI18n();
@@ -439,7 +442,7 @@ const actions = computed((): DatabaseAction[] => {
         resp.push({
           icon: h(DownloadIcon),
           text: t("custom-approval.risk-rule.risk.namespace.data_export"),
-          disabled: !allowExportData.value || props.databases.length !== 1,
+          disabled: !allowExportData.value,
           click: () => generateMultiDb("bb.issue.database.data.export"),
           tooltip: (action) => {
             if (!allowExportData.value) {
@@ -619,7 +622,7 @@ const onLabelsApply = async (labelsList: { [key: string]: string }[]) => {
       });
     })
   );
-  emit("update-cache", updatedDatabases);
+  emit("update", updatedDatabases);
 
   pushNotification({
     module: "bytebase",
@@ -641,7 +644,7 @@ const onEnvironmentUpdate = async (environment: string) => {
       });
     }),
   });
-  emit("update-cache", updatedDatabases);
+  emit("update", updatedDatabases);
 
   pushNotification({
     module: "bytebase",

@@ -20,6 +20,7 @@
     "risk-rule": {
       "template": {
         "presets": {
+          "request-role-high": "リクエスト プロジェクト オーナー ロールのリスクは高いと考えられます。",
           "environment-prod-high": "運用環境、デフォルトで高リスク",
           "environment-dev-low": "開発環境、デフォルトでは低リスク",
           "dml-in-environment-prod-10k-rows-high": "運用環境で更新または削除されたデータ行の数が 10,000 を超えており、デフォルトで高リスクとみなされます。",
@@ -251,5 +252,15 @@
         "desc": "指定されたドメインの電子メール アドレスを持つユーザーのみにサインインを制限します。"
       }
     }
+  },
+  "resource": {
+    "environment": "環境",
+    "instance": "例",
+    "project": "プロジェクト",
+    "idp": "アイデンティティプロバイダー",
+    "database-group": "データベースのグループ化",
+    "changelist": "変更リスト",
+    "review-config": "設定を確認する",
+    "role": "役割"
   }
 }

@@ -182,6 +182,10 @@ func TestSQLExport(t *testing.T) {
 		})
 		a.NoError(err)
 
+		a.NotNil(database.InstanceResource)
+		a.Equal(1, len(database.InstanceResource.DataSources))
+		dataSource := database.InstanceResource.DataSources[0]
+
 		err = ctl.changeDatabase(ctx, ctl.project, database, sheet, v1pb.Plan_ChangeDatabaseConfig_MIGRATE)
 		a.NoError(err)
 
@@ -191,11 +195,12 @@ func TestSQLExport(t *testing.T) {
 		checkResults(a, tt.databaseName, statement, tt.queryResult, results)
 
 		request := &v1pb.ExportRequest{
-			Name:      database.Name,
-			Format:    v1pb.ExportFormat_SQL,
-			Limit:     1,
-			Statement: tt.export,
-			Password:  tt.password,
+			Name:         database.Name,
+			Format:       v1pb.ExportFormat_SQL,
+			Limit:        1,
+			Statement:    tt.export,
+			Password:     tt.password,
+			DataSourceId: dataSource.Id,
 		}
 		export, err := ctl.sqlServiceClient.Export(ctx, request)
 		a.NoError(err)
@@ -211,7 +216,7 @@ func TestSQLExport(t *testing.T) {
 			a.NoError(err)
 			a.Equal(1, len(zipReader.File))
 
-			a.Equal(fmt.Sprintf("export.%s", strings.ToLower(request.Format.String())), zipReader.File[0].Name)
+			a.Equal(fmt.Sprintf("[0] %s.%s", tt.databaseName, strings.ToLower(request.Format.String())), zipReader.File[0].Name)
 			compressedFile := zipReader.File[0]
 			compressedFile.SetPassword(tt.password)
 			file, err := compressedFile.Open()

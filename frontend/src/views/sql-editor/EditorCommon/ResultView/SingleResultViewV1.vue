@@ -1,4 +1,13 @@
 <template>
+  <template v-if="result.messages.length > 0">
+    <div
+      v-for="(message, i) in result.messages"
+      :key="`message-${i}`"
+      :class="'text-control-light'"
+    >
+      <div>{{ `[${message.level}] ${message.content}` }}</div>
+    </div>
+  </template>
   <template v-if="viewMode === 'RESULT'">
     <BBAttention v-if="result.error" class="w-full mb-2" :type="'error'">
       <ErrorView :error="result.error" />
@@ -82,7 +91,6 @@
           <DataExportButton
             v-if="result.allowExport"
             size="small"
-            :file-type="'zip'"
             :disabled="props.result === null || isEmpty(props.result)"
             :support-formats="[
               ExportFormat.CSV,
@@ -90,9 +98,16 @@
               ExportFormat.SQL,
               ExportFormat.XLSX,
             ]"
-            :allow-specify-row-count="true"
+            :view-mode="'DRAWER'"
+            :support-password="true"
             @export="handleExportBtnClick"
-          />
+          >
+            <template #form>
+              <NFormItem :label="$t('common.database')">
+                <DatabaseInfo :database="database" />
+              </NFormItem>
+            </template>
+          </DataExportButton>
           <NButton
             v-else-if="allowToRequestExportData"
             size="small"
@@ -172,6 +187,7 @@ import { useDebounceFn, useLocalStorage } from "@vueuse/core";
 import dayjs from "dayjs";
 import { isEmpty } from "lodash-es";
 import { ExternalLinkIcon } from "lucide-vue-next";
+import { NFormItem } from "naive-ui";
 import {
   NButton,
   NInput,
@@ -181,14 +197,17 @@ import {
   type SelectOption,
   NSelect,
 } from "naive-ui";
-import type { BinaryLike } from "node:crypto";
 import { v4 as uuidv4 } from "uuid";
 import { computed, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { BBAttention } from "@/bbkit";
-import type { ExportOption } from "@/components/DataExportButton.vue";
+import type {
+  ExportOption,
+  DownloadContent,
+} from "@/components/DataExportButton.vue";
 import DataExportButton from "@/components/DataExportButton.vue";
+import DatabaseInfo from "@/components/DatabaseInfo.vue";
 import { DISMISS_PLACEHOLDER } from "@/plugins/ai/components/state";
 import { PROJECT_V1_ROUTE_ISSUE_DETAIL } from "@/router/dashboard/projectV1";
 import {
@@ -197,13 +216,16 @@ import {
   useConnectionOfCurrentSQLEditorTab,
   useSQLEditorStore,
   useAppFeature,
-  pushNotification,
   usePolicyByParentAndType,
   useStorageStore,
+  useSQLStore,
 } from "@/store";
-import { useExportData } from "@/store/modules/export";
 import type { ComposedDatabase, SQLEditorQueryParams } from "@/types";
-import { isValidDatabaseName, isValidInstanceName } from "@/types";
+import {
+  DEBOUNCE_SEARCH_DELAY,
+  isValidDatabaseName,
+  isValidInstanceName,
+} from "@/types";
 import { ExportFormat } from "@/types/proto/v1/common";
 import { Engine } from "@/types/proto/v1/common";
 import { PolicyType } from "@/types/proto/v1/org_policy_service";
@@ -245,7 +267,7 @@ const storedPageSize = useLocalStorage<number>(
 
 const props = defineProps<{
   params: SQLEditorQueryParams;
-  database?: ComposedDatabase;
+  database: ComposedDatabase;
   result: QueryResult;
   setIndex: number;
 }>();
@@ -331,7 +353,8 @@ const allowToRequestExportData = computed(() => {
 // use a debounced value to improve performance when typing rapidly
 const debouncedUpdateKeyword = useDebounceFn((value: string) => {
   keyword.value = value;
-}, 200);
+}, DEBOUNCE_SEARCH_DELAY);
+
 const updateKeyword = (value: string) => {
   state.search = value;
   debouncedUpdateKeyword(value);
@@ -426,18 +449,15 @@ const pageSizeOptions = computed(() => {
   }));
 });
 
-const handleExportBtnClick = async (
-  options: ExportOption,
-  callback: (content: BinaryLike | Blob, filename: string) => void
-) => {
-  // If props.database is specified and it's not unknown database
-  // the query is executed on database level
-  // otherwise the query is executed on instance level, we should use the
-  // `instanceId` from the tab's connection attributes
-  const database =
-    props.database && isValidDatabaseName(props.database.name)
-      ? props.database.name
-      : "";
+const handleExportBtnClick = async ({
+  options,
+  resolve,
+  reject,
+}: {
+  options: ExportOption;
+  reject: (reason?: any) => void;
+  resolve: (content: DownloadContent) => void;
+}) => {
   // use props.params.statement which is the "snapshot" of the query statement
   // not using props.result.statement because it might be rewritten by Query() API
   const statement = props.params.statement;
@@ -445,10 +465,9 @@ const handleExportBtnClick = async (
   const limit = options.limit ?? (admin ? 0 : editorStore.resultRowsLimit);
 
   try {
-    const content = await useExportData().exportData({
-      name: database,
-      // TODO(lj): support data source id similar to queries.
-      dataSourceId: "",
+    const content = await useSQLStore().exportData({
+      name: props.database.name,
+      dataSourceId: props.params.connection.dataSourceId ?? "",
       format: options.format,
       statement,
       limit,
@@ -456,17 +475,14 @@ const handleExportBtnClick = async (
       password: options.password,
     });
 
-    callback(
-      content,
-      `export-data.${dayjs(new Date()).format("YYYY-MM-DDTHH-mm-ss")}`
-    );
+    resolve([
+      {
+        content,
+        filename: `${props.database.databaseName}.${dayjs(new Date()).format("YYYY-MM-DDTHH-mm-ss")}`,
+      },
+    ]);
   } catch (e) {
-    pushNotification({
-      module: "bytebase",
-      style: "CRITICAL",
-      title: t("common.error"),
-      description: String(e),
-    });
+    reject(e);
   }
 };
 

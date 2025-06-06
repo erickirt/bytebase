@@ -21,7 +21,7 @@
           size="SMALL"
           class="ml-[-18px] first:ml-0"
         />
-        <heroicons:ellipsis-horizontal v-if="!readonly" class="w-5 h-5" />
+        <EllipsisIcon v-if="!readonly" class="w-4 h-4" />
       </div>
     </NButton>
 
@@ -37,13 +37,14 @@
 
 <script setup lang="ts">
 import { useDebounceFn } from "@vueuse/core";
+import { EllipsisIcon } from "lucide-vue-next";
 import type { SelectOption, SelectGroupOption } from "naive-ui";
 import { NButton, NPopselect, NInput } from "naive-ui";
 import { computed, h, nextTick, ref, reactive, watch } from "vue";
 import { updateIssueSubscribers, useIssueContext } from "@/components/IssueV1";
 import UserAvatar from "@/components/User/UserAvatar.vue";
 import { useUserStore } from "@/store";
-import { unknownUser } from "@/types";
+import { DEBOUNCE_SEARCH_DELAY, unknownUser } from "@/types";
 import { State } from "@/types/proto/v1/common";
 import { type User } from "@/types/proto/v1/user_service";
 import { UserType } from "@/types/proto/v1/user_service";
@@ -184,7 +185,19 @@ const handleSearch = useDebounceFn(async (search: string) => {
   } finally {
     state.loading = false;
   }
-});
+}, DEBOUNCE_SEARCH_DELAY);
 
 watch(() => keyword.value, handleSearch, { immediate: true });
+
+// Preload subscribers' user data.
+watch(
+  () => issue.value.subscribers,
+  (newSubscribers) => {
+    userStore.batchGetUsers(newSubscribers);
+  },
+  {
+    immediate: true,
+    deep: true,
+  }
+);
 </script>

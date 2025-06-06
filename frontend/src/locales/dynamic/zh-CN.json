@@ -20,6 +20,7 @@
     "risk-rule": {
       "template": {
         "presets": {
+          "request-role-high": "申请成为项目所有者，将会被认为是高风险",
           "environment-prod-high": "生产环境，默认为高风险",
           "environment-dev-low": "开发环境，默认为低风险",
           "dml-in-environment-prod-10k-rows-high": "生产环境中更新或删除的数据行数超过 10000，默认为高风险",
@@ -251,5 +252,15 @@
         "desc": "仅允许具有指定域名的电子邮箱的用户进行登录或注册。"
       }
     }
+  },
+  "resource": {
+    "environment": "环境",
+    "instance": "实例",
+    "project": "项目",
+    "idp": "身份提供商",
+    "database-group": "数据库分组",
+    "changelist": "变更列表",
+    "review-config": "审查配置",
+    "role": "角色"
   }
 }

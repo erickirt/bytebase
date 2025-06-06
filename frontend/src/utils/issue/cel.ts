@@ -71,22 +71,26 @@ const buildConditionTitle = ({
   const title = [displayRoleTitle(role)];
 
   let conditionSuffix = "";
-  if (!databaseResources || databaseResources.length === 0) {
-    conditionSuffix = `All databases`;
-  } else if (databaseResources.length <= 3) {
-    const databaseResourceNames = databaseResources.map((ds) =>
-      getDatabaseResourceName(ds)
-    );
-    conditionSuffix = `${databaseResourceNames.join(", ")}`;
-  } else {
-    const firstDatabaseResourceName = getDatabaseResourceName(
-      head(databaseResources)!
-    );
-    conditionSuffix = `${firstDatabaseResourceName} and ${
-      databaseResources.length - 1
-    } more`;
+  if (databaseResources !== undefined) {
+    if (databaseResources.length === 0) {
+      conditionSuffix = `All databases`;
+    } else if (databaseResources.length <= 3) {
+      const databaseResourceNames = databaseResources.map((ds) =>
+        getDatabaseResourceName(ds)
+      );
+      conditionSuffix = `${databaseResourceNames.join(", ")}`;
+    } else {
+      const firstDatabaseResourceName = getDatabaseResourceName(
+        head(databaseResources)!
+      );
+      conditionSuffix = `${firstDatabaseResourceName} and ${
+        databaseResources.length - 1
+      } more`;
+    }
   }
-  title.push(conditionSuffix);
+  if (conditionSuffix) {
+    title.push(conditionSuffix);
+  }
 
   if (expirationTimestampInMS) {
     title.push(
@@ -346,6 +350,21 @@ export const convertFromExpr = (expr: Expr): ConditionExpression => {
             databaseResource = {
               databaseFullName: "",
             };
+          }
+          switch (left) {
+            case "resource.instance_id":
+            case "resource.database_name":
+            case "resource.database": {
+              // should parse for next database.
+              if (databaseResource.databaseFullName !== "") {
+                conditionExpression.databaseResources?.push({
+                  ...databaseResource,
+                });
+                databaseResource = {
+                  databaseFullName: "",
+                };
+              }
+            }
           }
           switch (left) {
             case "resource.instance_id": {

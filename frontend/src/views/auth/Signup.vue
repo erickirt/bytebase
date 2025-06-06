@@ -29,7 +29,8 @@
               for="email"
               class="block text-sm font-medium leading-5 text-control"
             >
-              {{ $t("common.email") }} <span class="text-red-600">*</span>
+              {{ $t("common.email") }}
+              <RequiredStar />
             </label>
             <div class="mt-1 rounded-md shadow-sm">
               <BBTextField
@@ -56,7 +57,7 @@
               class="block text-sm font-medium leading-5 text-control"
             >
               {{ $t("common.username") }}
-              <span class="text-red-600"> * </span>
+              <RequiredStar />
             </label>
             <div class="mt-1 rounded-md shadow-sm">
               <BBTextField
@@ -142,17 +143,12 @@
 import { NButton, NCheckbox } from "naive-ui";
 import { storeToRefs } from "pinia";
 import { computed, onMounted, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
 import { BBTextField } from "@/bbkit";
 import BytebaseLogo from "@/components/BytebaseLogo.vue";
+import RequiredStar from "@/components/RequiredStar.vue";
 import UserPassword from "@/components/User/Settings/UserPassword.vue";
 import { AUTH_SIGNIN_MODULE } from "@/router/auth";
-import { SETUP_WORKSPACE_MODE_MODULE } from "@/router/setup";
-import {
-  useActuatorV1Store,
-  useAuthStore,
-  useOnboardingStateStore,
-} from "@/store";
+import { useActuatorV1Store, useAuthStore } from "@/store";
 import type { User } from "@/types/proto/v1/user_service";
 import { isValidEmail } from "@/utils";
 import AuthFooter from "./AuthFooter.vue";
@@ -168,7 +164,6 @@ interface LocalState {
 }
 
 const actuatorStore = useActuatorV1Store();
-const router = useRouter();
 const userPasswordRef = ref<InstanceType<typeof UserPassword>>();
 
 const state = reactive<LocalState>({
@@ -188,6 +183,7 @@ const allowSignup = computed(() => {
   return (
     isValidEmail(state.email) &&
     state.password &&
+    state.name &&
     !userPasswordRef.value?.passwordHint &&
     !userPasswordRef.value?.passwordMismatch &&
     state.acceptTermsAndPolicy &&
@@ -239,19 +235,6 @@ const trySignup = async () => {
       name: state.name,
     };
     await useAuthStore().signup(signupInfo);
-    if (needAdminSetup.value) {
-      await actuatorStore.fetchServerInfo();
-      // When the first time we created an end user, the server-side will
-      // generate onboarding data.
-      // We write a flag here to indicate that the workspace is just created
-      // and we can consume this flag somewhere else if needed.
-      useOnboardingStateStore().initialize();
-      router.replace({
-        name: SETUP_WORKSPACE_MODE_MODULE,
-      });
-    } else {
-      router.replace("/");
-    }
   } finally {
     state.isLoading = false;
   }

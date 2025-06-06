@@ -2,18 +2,18 @@ import { cloneDeep } from "lodash-es";
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { settingServiceClient } from "@/grpcweb";
-import type { LocalApprovalConfig, LocalApprovalRule } from "@/types";
+import { type LocalApprovalConfig, type LocalApprovalRule } from "@/types";
 import type { Risk_Source } from "@/types/proto/v1/risk_service";
 import type { Setting } from "@/types/proto/v1/setting_service";
+import { Setting_SettingName } from "@/types/proto/v1/setting_service";
 import {
   resolveLocalApprovalConfig,
   buildWorkspaceApprovalSetting,
   seedWorkspaceApprovalSetting,
 } from "@/utils";
-import { batchGetOrFetchUsers } from "./user";
 import { useGracefulRequest } from "./utils";
 
-const SETTING_NAME = "settings/bb.workspace.approval";
+const SETTING_NAME = `settings/${Setting_SettingName.WORKSPACE_APPROVAL}`;
 
 export const useWorkspaceApprovalSettingStore = defineStore(
   "workspaceApprovalSetting",
@@ -30,9 +30,6 @@ export const useWorkspaceApprovalSettingStore = defineStore(
         if (_config.rules.length === 0) {
           _config.rules.push(...seedWorkspaceApprovalSetting());
         }
-        await batchGetOrFetchUsers(
-          _config.rules.map((rule) => rule.template?.creator ?? "")
-        );
         config.value = await resolveLocalApprovalConfig(_config);
       }
     };

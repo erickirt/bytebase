@@ -75,10 +75,11 @@ func (d *Driver) Open(_ context.Context, dbType storepb.Engine, connCfg db.Conne
 		}
 		d.sshClient = sshClient
 		// Now we register the dialer with the ssh connection as a parameter.
-		mysql.RegisterDialContext("mysql+tcp", func(_ context.Context, addr string) (net.Conn, error) {
+		protocol = "mysql-tcp-" + uuid.NewString()[:8]
+		// Now we register the dialer with the ssh connection as a parameter.
+		mysql.RegisterDialContext(protocol, func(_ context.Context, addr string) (net.Conn, error) {
 			return sshClient.Dial("tcp", addr)
 		})
-		protocol = "mysql+tcp"
 	}
 
 	tlscfg, err := util.GetTLSConfig(connCfg.DataSource)
@@ -200,7 +201,7 @@ func (d *Driver) Execute(ctx context.Context, statement string, _ db.ExecuteOpti
 
 // QueryConn queries a SQL statement in a given connection.
 func (d *Driver) QueryConn(ctx context.Context, conn *sql.Conn, statement string, queryContext db.QueryContext) ([]*v1pb.QueryResult, error) {
-	singleSQLs, err := base.SplitMultiSQL(storepb.Engine_MYSQL, statement)
+	singleSQLs, err := base.SplitMultiSQL(storepb.Engine_DORIS, statement)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +226,7 @@ func (d *Driver) QueryConn(ctx context.Context, conn *sql.Conn, statement string
 		}
 		sqlWithBytebaseAppComment := util.MySQLPrependBytebaseAppComment(statement)
 
-		_, allQuery, err := base.ValidateSQLForEditor(storepb.Engine_MYSQL, statement)
+		_, allQuery, err := base.ValidateSQLForEditor(storepb.Engine_DORIS, statement)
 		if err != nil {
 			// TODO(d): need to make parser compatible.
 			slog.Error("failed to validate sql", slog.String("statement", statement), log.BBError(err))
@@ -257,7 +258,7 @@ func (d *Driver) QueryConn(ctx context.Context, conn *sql.Conn, statement string
 			if err != nil {
 				slog.Info("rowsAffected returns error", log.BBError(err))
 			}
-			return util.BuildAffectedRowsResult(affectedRows), nil
+			return util.BuildAffectedRowsResult(affectedRows, nil), nil
 		}()
 		stop := false
 		if err != nil {

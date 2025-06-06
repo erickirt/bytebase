@@ -10,6 +10,8 @@ import { createPlanSkeleton } from "./create";
 
 export * from "./create";
 
+export * from "./util";
+
 export function useInitializePlan(
   planSlug: MaybeRef<string>,
   project: MaybeRef<string> = "-",
@@ -67,21 +69,7 @@ export function useInitializePlan(
     { immediate: true }
   );
 
-  const reInitialize = async (overrides: Record<string, string> = {}) => {
-    const url = route.fullPath;
-    const query = convertRouterQuery(router.resolve(url).query);
-    try {
-      const updated = await createPlanSkeleton(route, {
-        ...query,
-        ...overrides,
-      });
-      plan.value = updated;
-    } catch {
-      // Nothing
-    }
-  };
-
-  return { isCreating, plan, isInitializing, reInitialize };
+  return { isCreating, plan, isInitializing };
 }
 
 export const convertRouterQuery = (query: LocationQuery) => {

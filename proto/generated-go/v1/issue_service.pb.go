@@ -81,10 +81,10 @@ func (IssueStatus) EnumDescriptor() ([]byte, []int) {
 type Issue_Type int32
 
 const (
-	Issue_TYPE_UNSPECIFIED     Issue_Type = 0
-	Issue_DATABASE_CHANGE      Issue_Type = 1
-	Issue_GRANT_REQUEST        Issue_Type = 2
-	Issue_DATABASE_DATA_EXPORT Issue_Type = 3
+	Issue_TYPE_UNSPECIFIED Issue_Type = 0
+	Issue_DATABASE_CHANGE  Issue_Type = 1
+	Issue_GRANT_REQUEST    Issue_Type = 2
+	Issue_DATABASE_EXPORT  Issue_Type = 3
 )
 
 // Enum value maps for Issue_Type.
@@ -93,13 +93,13 @@ var (
 		0: "TYPE_UNSPECIFIED",
 		1: "DATABASE_CHANGE",
 		2: "GRANT_REQUEST",
-		3: "DATABASE_DATA_EXPORT",
+		3: "DATABASE_EXPORT",
 	}
 	Issue_Type_value = map[string]int32{
-		"TYPE_UNSPECIFIED":     0,
-		"DATABASE_CHANGE":      1,
-		"GRANT_REQUEST":        2,
-		"DATABASE_DATA_EXPORT": 3,
+		"TYPE_UNSPECIFIED": 0,
+		"DATABASE_CHANGE":  1,
+		"GRANT_REQUEST":    2,
+		"DATABASE_EXPORT":  3,
 	}
 )
 
@@ -575,6 +575,25 @@ type ListIssuesRequest struct {
 	// the call that provided the page token.
 	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	// Filter is used to filter issues returned in the list.
+	// The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+	//
+	// Supported filters:
+	// - creator: issue creator full name in "users/{email or id}" format, support "==" operator.
+	// - subscriber: issue subscriber full name in "users/{email or id}" format, support "==" operator.
+	// - status: the issue status, support "==" and "in" operator, check the IssueStatus enum for the values.
+	// - create_time: issue create time in "2006-01-02T15:04:05Z07:00" format, support ">=" or "<=" operator.
+	// - type: the issue type, support "==" and "in" operator, check the Type enum in the Issue message for the values.
+	// - task_type: support "==" operator, the value can be "DDL", "DML" or "DATA_EXPORT"
+	// - instance: the instance full name in the "instances/{id}" format, support "==" operator.
+	// - database: the database full name in the "instances/{id}/databases/{name}" format, support "==" operator.
+	// - labels: the issue labels, support "==" and "in" operator.
+	// - has_pipeline: the issue has pipeline or not, support "==" operator, the value should be "true" or "false".
+	//
+	// For example:
+	// creator == "users/ed@bytebase.com" && status in ["OPEN", "DONE"]
+	// status == "CANCELED" && type == "DATABASE_CHANGE"
+	// instance == "instances/sample" && labels in ["label1", "label2"]
+	// has_pipeline == true && create_time >= "2025-01-02T15:04:05Z07:00"
 	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
 	// Query is the query statement.
 	Query         string `protobuf:"bytes,5,opt,name=query,proto3" json:"query,omitempty"`
@@ -720,6 +739,7 @@ type SearchIssuesRequest struct {
 	// the call that provided the page token.
 	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	// Filter is used to filter issues returned in the list.
+	// Check the filter field in the ListIssuesRequest message.
 	Filter string `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
 	// Query is the query statement.
 	Query         string `protobuf:"bytes,5,opt,name=query,proto3" json:"query,omitempty"`
@@ -1411,7 +1431,8 @@ type GrantRequest struct {
 	Role string `protobuf:"bytes,1,opt,name=role,proto3" json:"role,omitempty"`
 	// The user to be granted.
 	// Format: users/{email}.
-	User          string               `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	User string `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	// The condition for the role. Same as the condtion in IAM Binding message.
 	Condition     *expr.Expr           `protobuf:"bytes,3,opt,name=condition,proto3" json:"condition,omitempty"`
 	Expiration    *durationpb.Duration `protobuf:"bytes,4,opt,name=expiration,proto3" json:"expiration,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1477,13 +1498,10 @@ func (x *GrantRequest) GetExpiration() *durationpb.Duration {
 }
 
 type ApprovalTemplate struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Flow        *ApprovalFlow          `protobuf:"bytes,1,opt,name=flow,proto3" json:"flow,omitempty"`
-	Title       string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	Description string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	// The name of the creator in users/{email} format.
-	// TODO: we should mark it as OUTPUT_ONLY, but currently the frontend will post the approval setting with creator.
-	Creator       string `protobuf:"bytes,4,opt,name=creator,proto3" json:"creator,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Flow          *ApprovalFlow          `protobuf:"bytes,1,opt,name=flow,proto3" json:"flow,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1535,13 +1553,6 @@ func (x *ApprovalTemplate) GetTitle() string {
 func (x *ApprovalTemplate) GetDescription() string {
 	if x != nil {
 		return x.Description
-	}
-	return ""
-}
-
-func (x *ApprovalTemplate) GetCreator() string {
-	if x != nil {
-		return x.Creator
 	}
 	return ""
 }
@@ -2364,12 +2375,10 @@ type IssueComment_TaskUpdate struct {
 	// Format: projects/{project}/sheets/{sheet}
 	FromSheet *string `protobuf:"bytes,2,opt,name=from_sheet,json=fromSheet,proto3,oneof" json:"from_sheet,omitempty"`
 	// Format: projects/{project}/sheets/{sheet}
-	ToSheet                 *string                         `protobuf:"bytes,3,opt,name=to_sheet,json=toSheet,proto3,oneof" json:"to_sheet,omitempty"`
-	FromEarliestAllowedTime *timestamppb.Timestamp          `protobuf:"bytes,4,opt,name=from_earliest_allowed_time,json=fromEarliestAllowedTime,proto3,oneof" json:"from_earliest_allowed_time,omitempty"`
-	ToEarliestAllowedTime   *timestamppb.Timestamp          `protobuf:"bytes,5,opt,name=to_earliest_allowed_time,json=toEarliestAllowedTime,proto3,oneof" json:"to_earliest_allowed_time,omitempty"`
-	ToStatus                *IssueComment_TaskUpdate_Status `protobuf:"varint,6,opt,name=to_status,json=toStatus,proto3,enum=bytebase.v1.IssueComment_TaskUpdate_Status,oneof" json:"to_status,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	ToSheet       *string                         `protobuf:"bytes,3,opt,name=to_sheet,json=toSheet,proto3,oneof" json:"to_sheet,omitempty"`
+	ToStatus      *IssueComment_TaskUpdate_Status `protobuf:"varint,6,opt,name=to_status,json=toStatus,proto3,enum=bytebase.v1.IssueComment_TaskUpdate_Status,oneof" json:"to_status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *IssueComment_TaskUpdate) Reset() {
@@ -2421,20 +2430,6 @@ func (x *IssueComment_TaskUpdate) GetToSheet() string {
 		return *x.ToSheet
 	}
 	return ""
-}
-
-func (x *IssueComment_TaskUpdate) GetFromEarliestAllowedTime() *timestamppb.Timestamp {
-	if x != nil {
-		return x.FromEarliestAllowedTime
-	}
-	return nil
-}
-
-func (x *IssueComment_TaskUpdate) GetToEarliestAllowedTime() *timestamppb.Timestamp {
-	if x != nil {
-		return x.ToEarliestAllowedTime
-	}
-	return nil
 }
 
 func (x *IssueComment_TaskUpdate) GetToStatus() IssueComment_TaskUpdate_Status {
@@ -2629,7 +2624,7 @@ const file_v1_issue_service_proto_rawDesc = "" +
 	"\x13RequestIssueRequest\x12/\n" +
 	"\x04name\x18\x01 \x01(\tB\x1b\xe2A\x01\x02\xfaA\x14\n" +
 	"\x12bytebase.com/IssueR\x04name\x12\x18\n" +
-	"\acomment\x18\x02 \x01(\tR\acomment\"\x91\v\n" +
+	"\acomment\x18\x02 \x01(\tR\acomment\"\x8c\v\n" +
 	"\x05Issue\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12 \n" +
@@ -2665,12 +2660,12 @@ const file_v1_issue_service_proto_rawDesc = "" +
 	"\bREJECTED\x10\x03\x1aB\n" +
 	"\x14TaskStatusCountEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"^\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"Y\n" +
 	"\x04Type\x12\x14\n" +
 	"\x10TYPE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fDATABASE_CHANGE\x10\x01\x12\x11\n" +
-	"\rGRANT_REQUEST\x10\x02\x12\x18\n" +
-	"\x14DATABASE_DATA_EXPORT\x10\x03\"H\n" +
+	"\rGRANT_REQUEST\x10\x02\x12\x13\n" +
+	"\x0fDATABASE_EXPORT\x10\x03\"H\n" +
 	"\tRiskLevel\x12\x1a\n" +
 	"\x16RISK_LEVEL_UNSPECIFIED\x10\x00\x12\a\n" +
 	"\x03LOW\x10\x01\x12\f\n" +
@@ -2683,12 +2678,11 @@ const file_v1_issue_service_proto_rawDesc = "" +
 	"\tcondition\x18\x03 \x01(\v2\x11.google.type.ExprR\tcondition\x129\n" +
 	"\n" +
 	"expiration\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\n" +
-	"expiration\"\x93\x01\n" +
+	"expiration\"y\n" +
 	"\x10ApprovalTemplate\x12-\n" +
 	"\x04flow\x18\x01 \x01(\v2\x19.bytebase.v1.ApprovalFlowR\x04flow\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x18\n" +
-	"\acreator\x18\x04 \x01(\tR\acreator\"?\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\"?\n" +
 	"\fApprovalFlow\x12/\n" +
 	"\x05steps\x18\x01 \x03(\v2\x19.bytebase.v1.ApprovalStepR\x05steps\"\xa3\x01\n" +
 	"\fApprovalStep\x122\n" +
@@ -2722,7 +2716,7 @@ const file_v1_issue_service_proto_rawDesc = "" +
 	"\x12bytebase.com/IssueR\x06parent\x12>\n" +
 	"\rissue_comment\x18\x02 \x01(\v2\x19.bytebase.v1.IssueCommentR\fissueComment\x12A\n" +
 	"\vupdate_mask\x18\x03 \x01(\v2\x1a.google.protobuf.FieldMaskB\x04\xe2A\x01\x02R\n" +
-	"updateMask\"\xec\x10\n" +
+	"updateMask\"\xf8\x0e\n" +
 	"\fIssueComment\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\acomment\x18\x02 \x01(\tR\acomment\x12\x18\n" +
@@ -2767,16 +2761,14 @@ const file_v1_issue_service_proto_rawDesc = "" +
 	"\n" +
 	"_to_statusJ\x04\b\a\x10\bJ\x04\b\b\x10\t\x1a \n" +
 	"\bStageEnd\x12\x14\n" +
-	"\x05stage\x18\x01 \x01(\tR\x05stage\x1a\xc0\x04\n" +
+	"\x05stage\x18\x01 \x01(\tR\x05stage\x1a\xcc\x02\n" +
 	"\n" +
 	"TaskUpdate\x12\x14\n" +
 	"\x05tasks\x18\x01 \x03(\tR\x05tasks\x12\"\n" +
 	"\n" +
 	"from_sheet\x18\x02 \x01(\tH\x00R\tfromSheet\x88\x01\x01\x12\x1e\n" +
-	"\bto_sheet\x18\x03 \x01(\tH\x01R\atoSheet\x88\x01\x01\x12\\\n" +
-	"\x1afrom_earliest_allowed_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampH\x02R\x17fromEarliestAllowedTime\x88\x01\x01\x12X\n" +
-	"\x18to_earliest_allowed_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampH\x03R\x15toEarliestAllowedTime\x88\x01\x01\x12M\n" +
-	"\tto_status\x18\x06 \x01(\x0e2+.bytebase.v1.IssueComment.TaskUpdate.StatusH\x04R\btoStatus\x88\x01\x01\"k\n" +
+	"\bto_sheet\x18\x03 \x01(\tH\x01R\atoSheet\x88\x01\x01\x12M\n" +
+	"\tto_status\x18\x06 \x01(\x0e2+.bytebase.v1.IssueComment.TaskUpdate.StatusH\x02R\btoStatus\x88\x01\x01\"k\n" +
 	"\x06Status\x12\x16\n" +
 	"\x12STATUS_UNSPECIFIED\x10\x00\x12\v\n" +
 	"\aPENDING\x10\x01\x12\v\n" +
@@ -2787,9 +2779,7 @@ const file_v1_issue_service_proto_rawDesc = "" +
 	"\aSKIPPED\x10\x05\x12\f\n" +
 	"\bCANCELED\x10\x06B\r\n" +
 	"\v_from_sheetB\v\n" +
-	"\t_to_sheetB\x1d\n" +
-	"\x1b_from_earliest_allowed_timeB\x1b\n" +
-	"\x19_to_earliest_allowed_timeB\f\n" +
+	"\t_to_sheetB\f\n" +
 	"\n" +
 	"_to_status\x1a\x93\x02\n" +
 	"\x0fTaskPriorBackup\x12\x12\n" +
@@ -2920,39 +2910,37 @@ var file_v1_issue_service_proto_depIdxs = []int32{
 	6,  // 34: bytebase.v1.IssueComment.Approval.status:type_name -> bytebase.v1.IssueComment.Approval.Status
 	0,  // 35: bytebase.v1.IssueComment.IssueUpdate.from_status:type_name -> bytebase.v1.IssueStatus
 	0,  // 36: bytebase.v1.IssueComment.IssueUpdate.to_status:type_name -> bytebase.v1.IssueStatus
-	40, // 37: bytebase.v1.IssueComment.TaskUpdate.from_earliest_allowed_time:type_name -> google.protobuf.Timestamp
-	40, // 38: bytebase.v1.IssueComment.TaskUpdate.to_earliest_allowed_time:type_name -> google.protobuf.Timestamp
-	7,  // 39: bytebase.v1.IssueComment.TaskUpdate.to_status:type_name -> bytebase.v1.IssueComment.TaskUpdate.Status
-	38, // 40: bytebase.v1.IssueComment.TaskPriorBackup.tables:type_name -> bytebase.v1.IssueComment.TaskPriorBackup.Table
-	8,  // 41: bytebase.v1.IssueService.GetIssue:input_type -> bytebase.v1.GetIssueRequest
-	9,  // 42: bytebase.v1.IssueService.CreateIssue:input_type -> bytebase.v1.CreateIssueRequest
-	10, // 43: bytebase.v1.IssueService.ListIssues:input_type -> bytebase.v1.ListIssuesRequest
-	12, // 44: bytebase.v1.IssueService.SearchIssues:input_type -> bytebase.v1.SearchIssuesRequest
-	14, // 45: bytebase.v1.IssueService.UpdateIssue:input_type -> bytebase.v1.UpdateIssueRequest
-	26, // 46: bytebase.v1.IssueService.ListIssueComments:input_type -> bytebase.v1.ListIssueCommentsRequest
-	28, // 47: bytebase.v1.IssueService.CreateIssueComment:input_type -> bytebase.v1.CreateIssueCommentRequest
-	29, // 48: bytebase.v1.IssueService.UpdateIssueComment:input_type -> bytebase.v1.UpdateIssueCommentRequest
-	15, // 49: bytebase.v1.IssueService.BatchUpdateIssuesStatus:input_type -> bytebase.v1.BatchUpdateIssuesStatusRequest
-	17, // 50: bytebase.v1.IssueService.ApproveIssue:input_type -> bytebase.v1.ApproveIssueRequest
-	18, // 51: bytebase.v1.IssueService.RejectIssue:input_type -> bytebase.v1.RejectIssueRequest
-	19, // 52: bytebase.v1.IssueService.RequestIssue:input_type -> bytebase.v1.RequestIssueRequest
-	20, // 53: bytebase.v1.IssueService.GetIssue:output_type -> bytebase.v1.Issue
-	20, // 54: bytebase.v1.IssueService.CreateIssue:output_type -> bytebase.v1.Issue
-	11, // 55: bytebase.v1.IssueService.ListIssues:output_type -> bytebase.v1.ListIssuesResponse
-	13, // 56: bytebase.v1.IssueService.SearchIssues:output_type -> bytebase.v1.SearchIssuesResponse
-	20, // 57: bytebase.v1.IssueService.UpdateIssue:output_type -> bytebase.v1.Issue
-	27, // 58: bytebase.v1.IssueService.ListIssueComments:output_type -> bytebase.v1.ListIssueCommentsResponse
-	30, // 59: bytebase.v1.IssueService.CreateIssueComment:output_type -> bytebase.v1.IssueComment
-	30, // 60: bytebase.v1.IssueService.UpdateIssueComment:output_type -> bytebase.v1.IssueComment
-	16, // 61: bytebase.v1.IssueService.BatchUpdateIssuesStatus:output_type -> bytebase.v1.BatchUpdateIssuesStatusResponse
-	20, // 62: bytebase.v1.IssueService.ApproveIssue:output_type -> bytebase.v1.Issue
-	20, // 63: bytebase.v1.IssueService.RejectIssue:output_type -> bytebase.v1.Issue
-	20, // 64: bytebase.v1.IssueService.RequestIssue:output_type -> bytebase.v1.Issue
-	53, // [53:65] is the sub-list for method output_type
-	41, // [41:53] is the sub-list for method input_type
-	41, // [41:41] is the sub-list for extension type_name
-	41, // [41:41] is the sub-list for extension extendee
-	0,  // [0:41] is the sub-list for field type_name
+	7,  // 37: bytebase.v1.IssueComment.TaskUpdate.to_status:type_name -> bytebase.v1.IssueComment.TaskUpdate.Status
+	38, // 38: bytebase.v1.IssueComment.TaskPriorBackup.tables:type_name -> bytebase.v1.IssueComment.TaskPriorBackup.Table
+	8,  // 39: bytebase.v1.IssueService.GetIssue:input_type -> bytebase.v1.GetIssueRequest
+	9,  // 40: bytebase.v1.IssueService.CreateIssue:input_type -> bytebase.v1.CreateIssueRequest
+	10, // 41: bytebase.v1.IssueService.ListIssues:input_type -> bytebase.v1.ListIssuesRequest
+	12, // 42: bytebase.v1.IssueService.SearchIssues:input_type -> bytebase.v1.SearchIssuesRequest
+	14, // 43: bytebase.v1.IssueService.UpdateIssue:input_type -> bytebase.v1.UpdateIssueRequest
+	26, // 44: bytebase.v1.IssueService.ListIssueComments:input_type -> bytebase.v1.ListIssueCommentsRequest
+	28, // 45: bytebase.v1.IssueService.CreateIssueComment:input_type -> bytebase.v1.CreateIssueCommentRequest
+	29, // 46: bytebase.v1.IssueService.UpdateIssueComment:input_type -> bytebase.v1.UpdateIssueCommentRequest
+	15, // 47: bytebase.v1.IssueService.BatchUpdateIssuesStatus:input_type -> bytebase.v1.BatchUpdateIssuesStatusRequest
+	17, // 48: bytebase.v1.IssueService.ApproveIssue:input_type -> bytebase.v1.ApproveIssueRequest
+	18, // 49: bytebase.v1.IssueService.RejectIssue:input_type -> bytebase.v1.RejectIssueRequest
+	19, // 50: bytebase.v1.IssueService.RequestIssue:input_type -> bytebase.v1.RequestIssueRequest
+	20, // 51: bytebase.v1.IssueService.GetIssue:output_type -> bytebase.v1.Issue
+	20, // 52: bytebase.v1.IssueService.CreateIssue:output_type -> bytebase.v1.Issue
+	11, // 53: bytebase.v1.IssueService.ListIssues:output_type -> bytebase.v1.ListIssuesResponse
+	13, // 54: bytebase.v1.IssueService.SearchIssues:output_type -> bytebase.v1.SearchIssuesResponse
+	20, // 55: bytebase.v1.IssueService.UpdateIssue:output_type -> bytebase.v1.Issue
+	27, // 56: bytebase.v1.IssueService.ListIssueComments:output_type -> bytebase.v1.ListIssueCommentsResponse
+	30, // 57: bytebase.v1.IssueService.CreateIssueComment:output_type -> bytebase.v1.IssueComment
+	30, // 58: bytebase.v1.IssueService.UpdateIssueComment:output_type -> bytebase.v1.IssueComment
+	16, // 59: bytebase.v1.IssueService.BatchUpdateIssuesStatus:output_type -> bytebase.v1.BatchUpdateIssuesStatusResponse
+	20, // 60: bytebase.v1.IssueService.ApproveIssue:output_type -> bytebase.v1.Issue
+	20, // 61: bytebase.v1.IssueService.RejectIssue:output_type -> bytebase.v1.Issue
+	20, // 62: bytebase.v1.IssueService.RequestIssue:output_type -> bytebase.v1.Issue
+	51, // [51:63] is the sub-list for method output_type
+	39, // [39:51] is the sub-list for method input_type
+	39, // [39:39] is the sub-list for extension type_name
+	39, // [39:39] is the sub-list for extension extendee
+	0,  // [0:39] is the sub-list for field type_name
 }
 
 func init() { file_v1_issue_service_proto_init() }
