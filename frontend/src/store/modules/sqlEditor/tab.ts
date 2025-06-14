@@ -7,8 +7,12 @@ import type {
   SQLEditorConnection,
   CoreSQLEditorTab,
   SQLEditorTab,
+  SQLEditorDatabaseQueryContext,
+  BatchQueryContext,
 } from "@/types";
 import { DEFAULT_SQL_EDITOR_TAB_MODE, isValidDatabaseName } from "@/types";
+import { DataSourceType } from "@/types/proto/v1/instance_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import {
   WebStorageHelper,
   defaultSQLEditorTab,
@@ -23,6 +27,7 @@ import {
   useDatabaseV1ByName,
   useEnvironmentV1Store,
   extractUserId,
+  hasFeature,
 } from "../v1";
 import { useSQLEditorStore } from "./editor";
 import {
@@ -197,6 +202,24 @@ export const useSQLEditorTabStore = defineStore("sqlEditorTab", () => {
     return tabById(currId);
   });
 
+  const isInBatchMode = computed(() => {
+    if (!currentTab.value) {
+      return false;
+    }
+    if (!hasFeature(PlanFeature.FEATURE_BATCH_QUERY)) {
+      return false;
+    }
+    const { batchQueryContext } = currentTab.value;
+    if (!batchQueryContext) {
+      return false;
+    }
+    const { databaseGroups = [], databases = [] } = batchQueryContext;
+    if (!hasFeature(PlanFeature.FEATURE_DATABASE_GROUPS)) {
+      return databases.length > 1;
+    }
+    return databaseGroups.length > 0 || databases.length > 1;
+  });
+
   // actions
   /**
    *
@@ -246,6 +269,72 @@ export const useSQLEditorTabStore = defineStore("sqlEditorTab", () => {
     if (!id) return;
     updateTab(id, payload);
   };
+  const updateBatchQueryContext = (payload: Partial<BatchQueryContext>) => {
+    const tab = currentTab.value;
+    if (!tab) {
+      return;
+    }
+    updateTab(tab.id, {
+      batchQueryContext: {
+        databases: tab.batchQueryContext?.databases ?? [],
+        dataSourceType:
+          tab.batchQueryContext?.dataSourceType ?? DataSourceType.READ_ONLY,
+        ...tab.batchQueryContext,
+        ...payload,
+      },
+    });
+  };
+
+  // removeDatabaseQueryContext remove the context by id, and returns the next context.
+  const removeDatabaseQueryContext = ({
+    database,
+    contextId,
+  }: {
+    database: string;
+    contextId: string;
+  }): SQLEditorDatabaseQueryContext | undefined => {
+    const tab = tabById(currentTabId.value);
+    if (!tab || !tab.databaseQueryContexts) {
+      return;
+    }
+    if (!tab.databaseQueryContexts.has(database)) {
+      return;
+    }
+    const contexts = tab.databaseQueryContexts.get(database)!;
+    const index = contexts.findIndex((context) => context.id === contextId);
+    if (index < 0) {
+      return;
+    }
+    contexts.splice(index, 1);
+    return contexts[index] || contexts[index - 1];
+  };
+
+  const updateDatabaseQueryContext = ({
+    database,
+    contextId,
+    context,
+  }: {
+    database: string;
+    contextId: string;
+    context: Partial<SQLEditorDatabaseQueryContext>;
+  }) => {
+    const tab = tabById(currentTabId.value);
+    if (!tab || !tab.databaseQueryContexts) {
+      return;
+    }
+    if (!tab.databaseQueryContexts.has(database)) {
+      return;
+    }
+    const target = tab.databaseQueryContexts
+      .get(database)
+      ?.find((c) => c.id === contextId);
+    if (!target) {
+      return;
+    }
+    Object.assign(target, context);
+    return target;
+  };
+
   const setCurrentTabId = (id: string) => {
     currentTabId.value = id;
   };
@@ -381,12 +470,16 @@ export const useSQLEditorTabStore = defineStore("sqlEditorTab", () => {
     removeTab,
     updateTab,
     updateCurrentTab,
+    updateBatchQueryContext,
+    updateDatabaseQueryContext,
+    removeDatabaseQueryContext,
     setCurrentTabId,
     selectOrAddSimilarNewTab,
     maybeInitProject,
     reset,
     isDisconnected,
     isSwitchingTab,
+    isInBatchMode,
   };
 });
 

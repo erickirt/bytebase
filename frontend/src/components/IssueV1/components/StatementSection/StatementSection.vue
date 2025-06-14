@@ -5,48 +5,41 @@
       ref="editorViewRef"
       :advices="advices"
     />
-    <SDLView v-if="viewMode === 'SDL'" />
   </div>
 </template>
 
 <script setup lang="ts">
+import { usePlanSQLCheckContext } from "@/components/Plan/components/SQLCheckSection/context";
+import { databaseForTask } from "@/components/Rollout/RolloutDetail";
+import { useCurrentProjectV1 } from "@/store";
+import { TaskTypeListWithStatement } from "@/types";
+import { isValidTaskName } from "@/utils";
 import { useEventListener } from "@vueuse/core";
 import { computed, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { onBeforeRouteLeave } from "vue-router";
-import { useRouter } from "vue-router";
-import { TaskTypeListWithStatement } from "@/types";
-import { Task_Type } from "@/types/proto/v1/rollout_service";
-import { isValidTaskName } from "@/utils";
-import { databaseForTask, useIssueContext } from "../../logic";
-import { useIssueSQLCheckContext } from "../SQLCheckSection/context";
+import { onBeforeRouteLeave, useRouter } from "vue-router";
+import { useIssueContext } from "../../logic";
 import EditorView from "./EditorView";
-import SDLView from "./SDLView";
 
 const { t } = useI18n();
 const router = useRouter();
-const { issue, isCreating, selectedTask } = useIssueContext();
-const { resultMap } = useIssueSQLCheckContext();
+const { isCreating, selectedTask } = useIssueContext();
+const { project } = useCurrentProjectV1();
+const { resultMap } = usePlanSQLCheckContext();
 
 const editorViewRef = ref<InstanceType<typeof EditorView>>();
 
 const advices = computed(() => {
-  const database = databaseForTask(issue.value, selectedTask.value);
+  const database = databaseForTask(project.value, selectedTask.value);
   return resultMap.value[database.name]?.advices || [];
 });
 
-type ViewMode = "NONE" | "EDITOR" | "SDL";
+type ViewMode = "NONE" | "EDITOR";
 
 const viewMode = computed((): ViewMode => {
   if (isValidTaskName(selectedTask.value.name)) {
     const task = selectedTask.value;
     const { type } = task;
-    if (type === Task_Type.DATABASE_SCHEMA_UPDATE_SDL) {
-      return "SDL";
-    }
-    if (type === Task_Type.DATABASE_SCHEMA_BASELINE) {
-      return isCreating.value ? "EDITOR" : "NONE";
-    }
     if (TaskTypeListWithStatement.includes(type)) {
       return "EDITOR";
     }

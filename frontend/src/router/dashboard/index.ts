@@ -1,7 +1,8 @@
 import type { RouteRecordRaw } from "vue-router";
 import BodyLayout from "@/layouts/BodyLayout.vue";
 import DashboardLayout from "@/layouts/DashboardLayout.vue";
-import IssueLayout from "@/layouts/IssueLayout.vue";
+import IssuesLayout from "@/layouts/IssuesLayout.vue";
+import { t } from "@/plugins/i18n";
 import MyIssues from "@/views/MyIssues.vue";
 import environmentV1Routes from "./environmentV1";
 import instanceRoutes from "./instance";
@@ -28,10 +29,11 @@ const dashboardRoutes: RouteRecordRaw[] = [
       },
       {
         path: "issues",
-        components: {
-          body: IssueLayout,
-        },
+        components: { body: IssuesLayout },
         props: true,
+        meta: {
+          title: () => t("common.issues"),
+        },
         children: [
           {
             path: "",

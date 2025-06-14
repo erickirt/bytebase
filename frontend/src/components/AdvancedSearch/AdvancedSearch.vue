@@ -91,6 +91,7 @@ import scrollIntoView from "scroll-into-view-if-needed";
 import { zindexable as vZindexable } from "vdirs";
 import { reactive, watch, onMounted, ref, computed, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { DEBOUNCE_SEARCH_DELAY } from "@/types";
 import type { SearchParams, SearchScopeId } from "@/utils";
 import {
   emptySearchParams,
@@ -99,6 +100,7 @@ import {
   upsertScope,
   buildSearchTextBySearchParams,
   buildSearchParamsBySearchText,
+  mergeSearchParams,
 } from "@/utils";
 import ScopeMenu from "./ScopeMenu.vue";
 import ScopeTags from "./ScopeTags.vue";
@@ -252,7 +254,7 @@ const handleSearch = useDebounceFn(async (search: string) => {
     fetchState.loading = false;
     state.fetchDataStateMap.set(currentScopeOption.value.id, fetchState);
   }
-});
+}, DEBOUNCE_SEARCH_DELAY);
 
 watch(
   [() => currentScopeOption.value, () => currentValueForScope.value],
@@ -482,14 +484,17 @@ const maybeEmitIncompleteValue = () => {
   if (inputText.value !== `${state.currentScope}:`) {
     const updated = cloneDeep(props.params);
     updated.query = inputText.value;
-    emit("update:params", updated);
+    updateParams(updated);
   }
 };
+
+const updateParams = useDebounceFn((params: SearchParams) => {
+  emit("update:params", params);
+}, DEBOUNCE_SEARCH_DELAY * 2);
 
 const handleInputClick = () => {
   maybeSelectMatchedScope();
   maybeDeselectMismatchedScope();
-  maybeEmitIncompleteValue();
 };
 
 const handleKeyDown = (e: KeyboardEvent) => {
@@ -620,7 +625,7 @@ onMounted(() => {
       ...scope,
       readonly: existedScopes.get(scope.id),
     }));
-    emit("update:params", params);
+    emit("update:params", mergeSearchParams(cloneDeep(props.params), params));
   }
 });
 

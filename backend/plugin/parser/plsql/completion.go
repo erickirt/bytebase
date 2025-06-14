@@ -3,7 +3,7 @@ package plsql
 import (
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -186,6 +186,7 @@ type Completer struct {
 func NewTrickyCompleter(ctx context.Context, cCtx base.CompletionContext, statement string, caretLine int, caretOffset int) *Completer {
 	parser, lexer, scanner := prepareTrickyParserAndScanner(statement, caretLine, caretOffset)
 	core := base.NewCodeCompletionCore(
+		ctx,
 		parser,
 		newIgnoredTokens(),
 		newPreferredRules(),
@@ -215,6 +216,7 @@ func NewTrickyCompleter(ctx context.Context, cCtx base.CompletionContext, statem
 func NewStandardCompleter(ctx context.Context, cCtx base.CompletionContext, statement string, caretLine int, caretOffset int) *Completer {
 	parser, lexer, scanner := prepareParserAndScanner(statement, caretLine, caretOffset)
 	core := base.NewCodeCompletionCore(
+		ctx,
 		parser,
 		newIgnoredTokens(),
 		newPreferredRules(),
@@ -282,11 +284,20 @@ func (m CompletionMap) toSlice() []base.Candidate {
 	for _, candidate := range m {
 		result = append(result, candidate)
 	}
-	sort.Slice(result, func(i, j int) bool {
-		if result[i].Type != result[j].Type {
-			return result[i].Type < result[j].Type
+	slices.SortFunc(result, func(i, j base.Candidate) int {
+		if i.Type != j.Type {
+			if i.Type < j.Type {
+				return -1
+			}
+			return 1
 		}
-		return result[i].Text < result[j].Text
+		if i.Text < j.Text {
+			return -1
+		}
+		if i.Text > j.Text {
+			return 1
+		}
+		return 0
 	})
 	return result
 }
@@ -750,9 +761,7 @@ func (c *Completer) fetchSelectItemAliases(ruleStack []*base.RuleContext) []stri
 			for alias := range aliasMap {
 				result = append(result, alias)
 			}
-			sort.Slice(result, func(i, j int) bool {
-				return result[i] < result[j]
-			})
+			slices.Sort(result)
 			return result
 		}
 	}
@@ -1116,17 +1125,21 @@ func skipHeadingSQLs(statement string, caretLine int, caretOffset int) (string, 
 
 	start := 0
 	for i, sql := range list {
-		if sql.LastLine > caretLine || (sql.LastLine == caretLine && sql.LastColumn >= caretOffset) {
+		sqlEndLine := int(sql.End.GetLine())
+		sqlEndColumn := int(sql.End.GetColumn())
+		if sqlEndLine > caretLine || (sqlEndLine == caretLine && sqlEndColumn >= caretOffset) {
 			start = i
 			if i == 0 {
-				// The caret is in the first SQL statement, so we don't need to skip any SQL statement.
+				// The caret is in the first SQL statement, so we don't need to skip any SQL statements.
 				break
 			}
-			newCaretLine = caretLine - list[i-1].LastLine + 1 // Convert to 1-based.
-			if caretLine == list[i-1].LastLine {
-				// The caret is in the same line as the last SQL statement, so we don't need to skip any SQL statement.
-				// We just need to adjust the caret offset.
-				newCaretOffset = caretOffset - list[i-1].LastColumn - 1 // Convert to 0-based.
+			previousSQLEndLine := int(list[i-1].End.GetLine())
+			previousSQLEndColumn := int(list[i-1].End.GetColumn())
+			newCaretLine = caretLine - previousSQLEndLine + 1 // Convert to 1-based.
+			if caretLine == previousSQLEndLine {
+				// The caret is in the same line as the last line of the previous SQL statement.
+				// We need to adjust the caret offset.
+				newCaretOffset = caretOffset - previousSQLEndColumn - 1 // Convert to 0-based.
 			}
 			break
 		}

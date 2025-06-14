@@ -9,11 +9,11 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/component/iam"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	"github.com/bytebase/bytebase/backend/store"
+	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
@@ -22,11 +22,11 @@ type RoleService struct {
 	v1pb.UnimplementedRoleServiceServer
 	store          *store.Store
 	iamManager     *iam.Manager
-	licenseService enterprise.LicenseService
+	licenseService *enterprise.LicenseService
 }
 
 // NewRoleService returns a new instance of the role service.
-func NewRoleService(store *store.Store, iamManager *iam.Manager, licenseService enterprise.LicenseService) *RoleService {
+func NewRoleService(store *store.Store, iamManager *iam.Manager, licenseService *enterprise.LicenseService) *RoleService {
 	return &RoleService{
 		store:          store,
 		iamManager:     iamManager,
@@ -82,7 +82,7 @@ func (s *RoleService) getBuildinRole(roleID string) *store.RoleMessage {
 
 // CreateRole creates a new role.
 func (s *RoleService) CreateRole(ctx context.Context, request *v1pb.CreateRoleRequest) (*v1pb.Role, error) {
-	if err := s.licenseService.IsFeatureEnabled(base.FeatureCustomRole); err != nil {
+	if err := s.licenseService.IsFeatureEnabled(v1pb.PlanFeature_FEATURE_CUSTOM_ROLES); err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 
@@ -105,7 +105,13 @@ func (s *RoleService) CreateRole(ctx context.Context, request *v1pb.CreateRoleRe
 		Permissions: permissions,
 	}
 	if ok := iam.PermissionsExist(request.Role.Permissions...); !ok {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid permissions")
+		invalidPerms := []string{}
+		for _, p := range request.Role.Permissions {
+			if !iam.PermissionExist(p) {
+				invalidPerms = append(invalidPerms, p)
+			}
+		}
+		return nil, status.Errorf(codes.InvalidArgument, "invalid permissions: %v", invalidPerms)
 	}
 	roleMessage, err := s.store.CreateRole(ctx, create)
 	if err != nil {
@@ -119,7 +125,7 @@ func (s *RoleService) CreateRole(ctx context.Context, request *v1pb.CreateRoleRe
 
 // UpdateRole updates an existing role.
 func (s *RoleService) UpdateRole(ctx context.Context, request *v1pb.UpdateRoleRequest) (*v1pb.Role, error) {
-	if err := s.licenseService.IsFeatureEnabled(base.FeatureCustomRole); err != nil {
+	if err := s.licenseService.IsFeatureEnabled(v1pb.PlanFeature_FEATURE_CUSTOM_ROLES); err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 	if request.UpdateMask == nil {
@@ -161,7 +167,13 @@ func (s *RoleService) UpdateRole(ctx context.Context, request *v1pb.UpdateRoleRe
 			}
 			patch.Permissions = &permissions
 			if ok := iam.PermissionsExist(request.Role.Permissions...); !ok {
-				return nil, status.Errorf(codes.InvalidArgument, "invalid permissions")
+				invalidPerms := []string{}
+				for _, p := range request.Role.Permissions {
+					if !iam.PermissionExist(p) {
+						invalidPerms = append(invalidPerms, p)
+					}
+				}
+				return nil, status.Errorf(codes.InvalidArgument, "invalid permissions: %v", invalidPerms)
 			}
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "invalid update mask path: %s", path)
@@ -208,7 +220,7 @@ func (s *RoleService) DeleteRole(ctx context.Context, request *v1pb.DeleteRoleRe
 			}
 			if usedResource.Resource != "" {
 				usedBy = append(usedBy, usedResource.Resource)
-			} else if usedResource.ResourceType == base.PolicyResourceTypeWorkspace {
+			} else if usedResource.ResourceType == storepb.Policy_WORKSPACE {
 				usedBy = append(usedBy, "workspace")
 			}
 		}

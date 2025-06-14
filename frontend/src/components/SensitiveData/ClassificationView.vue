@@ -3,7 +3,7 @@
     <div class="text-sm text-control-light">
       {{ $t("database.classification.description") }}
       <LearnMoreLink
-        url="https://www.bytebase.com/docs/security/data-masking/data-classification?source=console"
+        url="https://docs.bytebase.com/security/data-masking/data-classification?source=console"
         class="ml-1"
       />
     </div>
@@ -12,7 +12,7 @@
         <NSwitch
           :value="!state.classification.classificationFromConfig"
           :disabled="
-            !allowEdit || !hasSensitiveDataFeature || !hasClassificationConfig
+            !allowEdit || !hasClassificationFeature || !hasClassificationConfig
           "
           @update:value="onClassificationConfigChange"
         />
@@ -47,7 +47,7 @@
       <div class="flex items-center justify-end gap-2">
         <NButton
           type="primary"
-          :disabled="!allowEdit || !hasSensitiveDataFeature"
+          :disabled="!allowEdit || !hasClassificationFeature"
           @click="onUpload"
         >
           <template #icon>
@@ -60,7 +60,7 @@
           type="file"
           accept=".json"
           class="sr-only hidden"
-          :disabled="!allowEdit || !hasSensitiveDataFeature"
+          :disabled="!allowEdit || !hasClassificationFeature"
           @input="onFileChange"
         />
       </div>
@@ -74,7 +74,7 @@
         class="space-y-1 text-center flex flex-col justify-center items-center absolute top-0 bottom-0 left-0 right-0"
         :support-file-extensions="['.json']"
         :max-file-size-in-mi-b="maxFileSizeInMiB"
-        :disabled="!allowEdit || !hasSensitiveDataFeature"
+        :disabled="!allowEdit || !hasClassificationFeature"
         @on-select="onFileSelect"
       >
       </SingleFileSelector>
@@ -102,8 +102,10 @@ import { featureToRef, useSettingV1Store, pushNotification } from "@/store";
 import {
   DataClassificationSetting_DataClassificationConfig_Level as ClassificationLevel,
   DataClassificationSetting_DataClassificationConfig_DataClassification as DataClassification,
+  DataClassificationSetting_DataClassificationConfig,
+  Setting_SettingName,
 } from "@/types/proto/v1/setting_service";
-import { DataClassificationSetting_DataClassificationConfig } from "@/types/proto/v1/setting_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
 import LearnMoreLink from "../LearnMoreLink.vue";
 import ClassificationTree from "../SchemaTemplate/ClassificationTree.vue";
@@ -151,7 +153,7 @@ const emptyConfig = computed(
 const allowSave = computed(() => {
   return (
     allowEdit.value &&
-    hasSensitiveDataFeature.value &&
+    hasClassificationFeature.value &&
     !isEqual(formerConfig.value, state.classification)
   );
 });
@@ -193,7 +195,7 @@ const saveChanges = async () => {
 
 const upsertSetting = async () => {
   await settingStore.upsertSetting({
-    name: "bb.workspace.data-classification",
+    name: Setting_SettingName.DATA_CLASSIFICATION,
     value: {
       dataClassificationSettingValue: {
         configs: [state.classification],
@@ -211,7 +213,9 @@ const allowEdit = computed(() => {
   return hasWorkspacePermissionV2("bb.settings.set");
 });
 
-const hasSensitiveDataFeature = featureToRef("bb.feature.sensitive-data");
+const hasClassificationFeature = featureToRef(
+  PlanFeature.FEATURE_DATA_CLASSIFICATION
+);
 
 const onUpload = () => {
   uploader.value?.click();

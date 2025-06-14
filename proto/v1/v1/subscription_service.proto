@@ -8,17 +8,14 @@ import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
 import "v1/annotation.proto";
 
-option go_package = "generated-go/v1";
+option go_package = "github.com/bytebase/bytebase/proto/generated-go/v1";
 
 service SubscriptionService {
+  // GetSubscription returns the current subscription.
+  // If there is no license, we will return a free plan subscription without expiration time.
+  // If there is expired license, we will return a free plan subscription with the expiration time of the expired license.
   rpc GetSubscription(GetSubscriptionRequest) returns (Subscription) {
     option (google.api.http) = {get: "/v1/subscription"};
-    option (google.api.method_signature) = "";
-    option (bytebase.v1.allow_without_credential) = true;
-  }
-
-  rpc GetFeatureMatrix(GetFeatureMatrixRequest) returns (FeatureMatrix) {
-    option (google.api.http) = {get: "/v1/feature"};
     option (google.api.method_signature) = "";
     option (bytebase.v1.allow_without_credential) = true;
   }
@@ -26,7 +23,7 @@ service SubscriptionService {
   rpc UpdateSubscription(UpdateSubscriptionRequest) returns (Subscription) {
     option (google.api.http) = {
       patch: "/v1/subscription"
-      body: "patch"
+      body: "license"
     };
     option (google.api.method_signature) = "patch";
     option (bytebase.v1.permission) = "bb.settings.set";
@@ -36,10 +33,8 @@ service SubscriptionService {
 
 message GetSubscriptionRequest {}
 
-message GetFeatureMatrixRequest {}
-
 message UpdateSubscriptionRequest {
-  PatchSubscription patch = 1;
+  string license = 1;
 }
 
 enum PlanType {
@@ -52,10 +47,6 @@ enum PlanType {
   ENTERPRISE = 3;
 }
 
-message PatchSubscription {
-  string license = 1;
-}
-
 message Subscription {
   int32 seat_count = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 
@@ -63,25 +54,107 @@ message Subscription {
 
   google.protobuf.Timestamp expires_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  google.protobuf.Timestamp started_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  PlanType plan = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  PlanType plan = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool trialing = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  bool trialing = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  string org_id = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
-
-  string org_name = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string org_name = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-message FeatureMatrix {
-  repeated Feature features = 1;
+// PlanFeature represents the available features in Bytebase
+enum PlanFeature {
+  FEATURE_UNSPECIFIED = 0;
+
+  // Database Change Management
+  FEATURE_DATABASE_CHANGE = 1;
+  FEATURE_GIT_BASED_SCHEMA_VERSION_CONTROL = 2;
+  FEATURE_DECLARATIVE_SCHEMA_MIGRATION = 3;
+  FEATURE_COMPARE_AND_SYNC_SCHEMA = 4;
+  FEATURE_ONLINE_SCHEMA_CHANGE = 5;
+  FEATURE_PRE_DEPLOYMENT_SQL_REVIEW = 6;
+  FEATURE_AUTOMATIC_BACKUP_BEFORE_DATA_CHANGES = 7;
+  FEATURE_ONE_CLICK_DATA_ROLLBACK = 8;
+  FEATURE_MULTI_DATABASE_BATCH_CHANGES = 9;
+  FEATURE_PROGRESSIVE_ENVIRONMENT_DEPLOYMENT = 10;
+  FEATURE_SCHEDULED_ROLLOUT_TIME = 11;
+  FEATURE_DATABASE_CHANGELOG = 12;
+  FEATURE_SCHEMA_DRIFT_DETECTION = 13;
+  FEATURE_CHANGELIST = 14;
+  FEATURE_SCHEMA_TEMPLATE = 15;
+  FEATURE_ROLLOUT_POLICY = 16;
+
+  // SQL Editor & Development
+  FEATURE_WEB_BASED_SQL_EDITOR = 17;
+  FEATURE_SQL_EDITOR_ADMIN_MODE = 18;
+  FEATURE_NATURAL_LANGUAGE_TO_SQL = 19;
+  FEATURE_AI_QUERY_EXPLANATION = 20;
+  FEATURE_AI_QUERY_SUGGESTIONS = 21;
+  FEATURE_AUTO_COMPLETE = 22;
+  FEATURE_SCHEMA_DIAGRAM = 23;
+  FEATURE_SCHEMA_EDITOR = 24;
+  FEATURE_DATA_EXPORT = 25;
+  FEATURE_QUERY_HISTORY = 26;
+  FEATURE_SAVED_AND_SHARED_SQL_SCRIPTS = 27;
+  FEATURE_BATCH_QUERY = 28;
+  FEATURE_INSTANCE_READ_ONLY_CONNECTION = 29;
+  FEATURE_QUERY_POLICY = 30;
+  FEATURE_RESTRICT_COPYING_DATA = 31;
+
+  // Security & Compliance
+  FEATURE_IAM = 32;
+  FEATURE_INSTANCE_SSL_CONNECTION = 33;
+  FEATURE_INSTANCE_CONNECTION_OVER_SSH_TUNNEL = 34;
+  FEATURE_INSTANCE_CONNECTION_IAM_AUTHENTICATION = 35;
+  FEATURE_GOOGLE_AND_GITHUB_SSO = 36;
+  FEATURE_USER_GROUPS = 37;
+  FEATURE_DISALLOW_SELF_SERVICE_SIGNUP = 38;
+  FEATURE_DATABASE_SECRET_VARIABLES = 39;
+  FEATURE_CUSTOM_INSTANCE_SYNC_TIME = 40;
+  FEATURE_CUSTOM_INSTANCE_CONNECTION_LIMIT = 41;
+  FEATURE_RISK_ASSESSMENT = 42;
+  FEATURE_APPROVAL_WORKFLOW = 43;
+  FEATURE_AUDIT_LOG = 44;
+  FEATURE_ENTERPRISE_SSO = 45;
+  FEATURE_TWO_FA = 46;
+  FEATURE_PASSWORD_RESTRICTIONS = 47;
+  FEATURE_DISALLOW_PASSWORD_SIGNIN = 48;
+  FEATURE_CUSTOM_ROLES = 49;
+  FEATURE_REQUEST_ROLE_WORKFLOW = 50;
+  FEATURE_DATA_MASKING = 51;
+  FEATURE_DATA_CLASSIFICATION = 52;
+  FEATURE_SCIM = 53;
+  FEATURE_DIRECTORY_SYNC = 54;
+  FEATURE_SIGN_IN_FREQUENCY_CONTROL = 55;
+  FEATURE_EXTERNAL_SECRET_MANAGER = 56;
+  FEATURE_USER_EMAIL_DOMAIN_RESTRICTION = 57;
+
+  // Administration & Support
+  FEATURE_ENVIRONMENT_MANAGEMENT = 58;
+  FEATURE_IM_NOTIFICATIONS = 59;
+  FEATURE_TERRAFORM_PROVIDER = 60;
+  FEATURE_DATABASE_GROUPS = 61;
+  FEATURE_ENVIRONMENT_TIERS = 62;
+  FEATURE_DASHBOARD_ANNOUNCEMENT = 63;
+  FEATURE_API_INTEGRATION_GUIDANCE = 64;
+  FEATURE_CUSTOM_LOGO = 65;
+  FEATURE_WATERMARK = 66;
+  FEATURE_ROADMAP_PRIORITIZATION = 67;
+  FEATURE_CUSTOM_MSA = 68;
+  FEATURE_COMMUNITY_SUPPORT = 69;
+  FEATURE_EMAIL_SUPPORT = 70;
+  FEATURE_DEDICATED_SUPPORT_WITH_SLA = 71;
 }
 
-message Feature {
-  // Name is the feature name.
-  string name = 1;
+// PlanConfig represents the configuration for all plans loaded from plan.yaml
+message PlanConfig {
+  repeated PlanLimitConfig plans = 1;
+  repeated PlanFeature instance_features = 2;
+}
 
-  // Matrix is the feature matrix for different plan. The key is the plan enum in string value.
-  map<string, bool> matrix = 2;
+// PlanLimitConfig represents a single plan's configuration
+message PlanLimitConfig {
+  PlanType type = 1;
+  int32 maximum_instance_count = 2;
+  int32 maximum_seat_count = 3;
+  repeated PlanFeature features = 4;
 }

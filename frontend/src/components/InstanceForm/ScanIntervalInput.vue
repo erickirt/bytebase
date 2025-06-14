@@ -7,10 +7,6 @@
       <label class="textlabel">
         {{ $t("instance.scan-interval.self") }}
       </label>
-      <FeatureBadge
-        feature="bb.feature.custom-instance-synchronization"
-        :instance="instance"
-      />
     </div>
     <div class="textinfolabel">
       {{ $t("instance.scan-interval.description") }}
@@ -18,7 +14,7 @@
     <div class="flex items-center gap-x-6">
       <NRadio
         :checked="state.mode === 'DEFAULT'"
-        :disabled="!allowEdit || !hasFeature"
+        :disabled="!allowEdit"
         value="DEFAULT"
         @click="handleModeChange('DEFAULT')"
       >
@@ -28,7 +24,7 @@
       <div class="flex items-center">
         <NRadio
           :checked="state.mode === 'CUSTOM'"
-          :disabled="!allowEdit || !hasFeature"
+          :disabled="!allowEdit"
           value="CUSTOM"
           class="!items-center"
           @click="handleModeChange('CUSTOM')"
@@ -42,7 +38,7 @@
               size="small"
               style="width: 4rem"
               :status="state.isValid ? undefined : 'error'"
-              :disabled="state.mode !== 'CUSTOM' || !hasFeature"
+              :disabled="state.mode !== 'CUSTOM'"
               @update:value="handleMinuteChange($event as number)"
             />
             <span v-if="!state.isValid" class="text-error">
@@ -61,11 +57,9 @@
 </template>
 
 <script setup lang="ts">
-import { NInputNumber, NRadio } from "naive-ui";
-import { computed, reactive, watch } from "vue";
-import { useSubscriptionV1Store } from "@/store";
 import { Duration } from "@/types/proto/google/protobuf/duration";
-import { FeatureBadge } from "../FeatureGuard";
+import { NInputNumber, NRadio } from "naive-ui";
+import { reactive, watch } from "vue";
 import { useInstanceFormContext } from "./context";
 
 type Mode = "DEFAULT" | "CUSTOM";
@@ -87,15 +81,7 @@ const emit = defineEmits<{
   (event: "update:scan-interval", interval: Duration | undefined): void;
 }>();
 
-const subscriptionStore = useSubscriptionV1Store();
-const { instance, hideAdvancedFeatures } = useInstanceFormContext();
-
-const hasFeature = computed(() => {
-  return subscriptionStore.hasInstanceFeature(
-    "bb.feature.custom-instance-synchronization",
-    instance.value
-  );
-});
+const { hideAdvancedFeatures } = useInstanceFormContext();
 
 const extractStateFromDuration = (
   duration: Duration | undefined

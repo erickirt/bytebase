@@ -1,7 +1,7 @@
 <template>
   <NConfigProvider
     v-bind="naiveUIConfig"
-    class="relative flex flex-col justify-start items-start p-2 pb-1 overflow-y-auto"
+    class="relative flex flex-col justify-start items-start pb-1 overflow-y-auto"
     :class="dark && 'dark bg-dark-bg'"
   >
     <template v-if="executeParams && resultSet && !showPlaceholder">
@@ -11,6 +11,7 @@
           :error="resultSet.results[0]?.error"
           :execute-params="executeParams"
           :result-set="resultSet"
+          @execute="$emit('execute', $event)"
         />
         <SingleResultViewV1
           v-else
@@ -22,7 +23,7 @@
       </template>
       <template v-else-if="viewMode === 'MULTI-RESULT'">
         <NTabs
-          type="card"
+          type="line"
           size="small"
           class="flex-1 flex flex-col overflow-hidden"
           style="--n-tab-padding: 4px 12px"
@@ -30,21 +31,29 @@
           <NTabPane
             v-for="(result, i) in filteredResults"
             :key="i"
-            :name="tabName(result, i)"
+            :name="tabName(i)"
             class="flex-1 flex flex-col overflow-hidden"
           >
             <template #tab>
-              <span>{{ tabName(result, i) }}</span>
-              <Info
-                v-if="result.error"
-                class="ml-2 text-yellow-600 w-4 h-auto"
-              />
+              <NTooltip>
+                <template #trigger>
+                  <div class="flex items-center space-x-2">
+                    <span>{{ tabName(i) }}</span>
+                    <Info
+                      v-if="result.error"
+                      class="text-yellow-600 w-4 h-auto"
+                    />
+                  </div>
+                </template>
+                {{ result.statement }}
+              </NTooltip>
             </template>
             <ErrorView
               v-if="result.error"
               :error="result.error"
               :execute-params="executeParams"
               :result-set="resultSet"
+              @execute="$emit('execute', $event)"
             />
             <SingleResultViewV1
               v-else
@@ -64,6 +73,7 @@
           :error="resultSet.error"
           :execute-params="executeParams"
           :result-set="resultSet"
+          @execute="$emit('execute', $event)"
         >
           <template #suffix>
             <RequestQueryButton
@@ -98,17 +108,22 @@
       </template>
     </div>
 
-    <Drawer v-model:show="detail.show" @close="detail.show = false">
-      <DetailPanel v-if="detail.show" />
+    <Drawer :show="!!detail" @close="detail = undefined">
+      <DetailPanel />
     </Drawer>
   </NConfigProvider>
 </template>
 
 <script lang="ts" setup>
 import { Info } from "lucide-vue-next";
-import { darkTheme, NConfigProvider, NTabs, NTabPane } from "naive-ui";
+import {
+  darkTheme,
+  NConfigProvider,
+  NTabPane,
+  NTabs,
+  NTooltip,
+} from "naive-ui";
 import { Status } from "nice-grpc-common";
-import type { PropType } from "vue";
 import { computed, ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { darkThemeOverrides } from "@/../naive-ui.config";
@@ -117,20 +132,19 @@ import SyncDatabaseButton from "@/components/DatabaseDetail/SyncDatabaseButton.v
 import { parseStringToResource } from "@/components/GrantRequestPanel/DatabaseResourceForm/common";
 import { Drawer } from "@/components/v2";
 import {
-  hasFeature,
   useAppFeature,
   useConnectionOfCurrentSQLEditorTab,
   usePolicyV1Store,
 } from "@/store";
 import type {
   ComposedDatabase,
+  DatabaseResource,
   SQLEditorQueryParams,
   SQLResultSetV1,
-  DatabaseResource,
 } from "@/types";
 import { PolicyType } from "@/types/proto/v1/org_policy_service";
-import type { QueryResult } from "@/types/proto/v1/sql_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
+import { provideBinaryFormatContext } from "./DataTable/binary-format-store";
 import DetailPanel from "./DetailPanel";
 import EmptyView from "./EmptyView.vue";
 import ErrorView from "./ErrorView";
@@ -141,28 +155,26 @@ import { provideSQLResultViewContext } from "./context";
 
 type ViewMode = "SINGLE-RESULT" | "MULTI-RESULT" | "EMPTY" | "ERROR";
 
-const props = defineProps({
-  executeParams: {
-    type: Object as PropType<SQLEditorQueryParams>,
-    default: undefined,
-  },
-  database: {
-    type: Object as PropType<ComposedDatabase>,
-    default: undefined,
-  },
-  resultSet: {
-    type: Object as PropType<SQLResultSetV1>,
-    default: undefined,
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  dark: {
-    type: Boolean,
-    default: false,
-  },
-});
+const props = withDefaults(
+  defineProps<{
+    executeParams: SQLEditorQueryParams;
+    database: ComposedDatabase;
+    resultSet?: SQLResultSetV1;
+    loading?: boolean;
+    dark?: boolean;
+    contextId: string;
+  }>(),
+  {
+    executeParams: undefined,
+    resultSet: undefined,
+    loading: false,
+    dark: false,
+  }
+);
+
+defineEmits<{
+  (event: "execute", params: SQLEditorQueryParams): void;
+}>();
 
 const { t } = useI18n();
 const policyStore = usePolicyV1Store();
@@ -175,13 +187,9 @@ const disallowSyncSchema = useAppFeature(
   "bb.feature.sql-editor.disallow-sync-schema"
 );
 const keyword = ref("");
-const detail: SQLResultViewContext["detail"] = ref({
-  show: false,
-  set: 0,
-  row: 0,
-  col: 0,
-  table: undefined,
-});
+const detail: SQLResultViewContext["detail"] = ref(undefined);
+
+provideBinaryFormatContext(computed(() => props.contextId));
 
 const missingResource = computed((): DatabaseResource | undefined => {
   if (props.resultSet?.status !== Status.PERMISSION_DENIED) {
@@ -199,12 +207,7 @@ const missingResource = computed((): DatabaseResource | undefined => {
 });
 
 const showRequestQueryButton = computed(() => {
-  // Developer self-helped request query is guarded by "Access Control" feature
-  return (
-    hasFeature("bb.feature.access-control") &&
-    !disallowRequestQuery.value &&
-    missingResource.value
-  );
+  return !disallowRequestQuery.value && missingResource.value;
 });
 
 const viewMode = computed((): ViewMode => {
@@ -239,7 +242,7 @@ const showPlaceholder = computed(() => {
   return false;
 });
 
-const tabName = (result: QueryResult, index: number) => {
+const tabName = (index: number) => {
   return `${t("common.query")} #${index + 1}`;
 };
 
@@ -249,6 +252,7 @@ const disallowCopyingData = computed(() => {
     return false;
   }
 
+  let environment = instance.value.environment;
   if (props.database) {
     const projectLevelPolicy = policyStore.getPolicyByParentAndType({
       parentPath: props.database?.project,
@@ -257,10 +261,13 @@ const disallowCopyingData = computed(() => {
     if (projectLevelPolicy?.disableCopyDataPolicy?.active) {
       return true;
     }
+    // If the database is provided, use its effective environment.
+    environment = props.database.effectiveEnvironment;
   }
 
+  // Check if the environment has a policy that disables copying data.
   const policy = policyStore.getPolicyByParentAndType({
-    parentPath: instance.value.environment,
+    parentPath: environment,
     policyType: PolicyType.DISABLE_COPY_DATA,
   });
   if (policy?.disableCopyDataPolicy?.active) {
@@ -280,34 +287,10 @@ const filteredResults = computed(() => {
   });
 });
 
-// Create a ref for column type names to share via context
-// This needs to update when the user switches result tabs
-const columnTypeNamesRef = computed(() => {
-  // If no result set, return undefined
-  if (!props.resultSet?.results) return undefined;
-
-  // For single result mode, use the first result
-  if (viewMode.value === "SINGLE-RESULT") {
-    return props.resultSet.results[0]?.columnTypeNames;
-  }
-
-  // For multi-result mode, use the active tab's result
-  // The active tab corresponds to the detail.set value
-  if (
-    viewMode.value === "MULTI-RESULT" &&
-    detail.value.set < filteredResults.value.length
-  ) {
-    return filteredResults.value[detail.value.set]?.columnTypeNames;
-  }
-
-  return undefined;
-});
-
 provideSQLResultViewContext({
   dark: toRef(props, "dark"),
   disallowCopyingData,
   keyword,
   detail,
-  columnTypeNames: columnTypeNamesRef,
 });
 </script>

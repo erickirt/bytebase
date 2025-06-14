@@ -18,13 +18,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/bytebase/bytebase/backend/api/auth"
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/component/config"
 	"github.com/bytebase/bytebase/backend/component/iam"
 	"github.com/bytebase/bytebase/backend/component/state"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	metricapi "github.com/bytebase/bytebase/backend/metric"
 	"github.com/bytebase/bytebase/backend/plugin/idp/ldap"
 	"github.com/bytebase/bytebase/backend/plugin/idp/oauth2"
@@ -36,8 +35,6 @@ import (
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
-type CreateUserFunc func(ctx context.Context, user *store.UserMessage, firstEndUser bool) error
-
 var (
 	invalidUserOrPasswordError = status.Errorf(codes.Unauthenticated, "The email or password is not valid.")
 )
@@ -47,16 +44,15 @@ type AuthService struct {
 	v1pb.UnimplementedAuthServiceServer
 	store          *store.Store
 	secret         string
-	licenseService enterprise.LicenseService
+	licenseService *enterprise.LicenseService
 	metricReporter *metricreport.Reporter
 	profile        *config.Profile
 	stateCfg       *state.State
 	iamManager     *iam.Manager
-	postCreateUser func(ctx context.Context, user *store.UserMessage, firstEndUser bool) error
 }
 
 // NewAuthService creates a new AuthService.
-func NewAuthService(store *store.Store, secret string, licenseService enterprise.LicenseService, metricReporter *metricreport.Reporter, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager, postCreateUser func(ctx context.Context, user *store.UserMessage, firstEndUser bool) error) *AuthService {
+func NewAuthService(store *store.Store, secret string, licenseService *enterprise.LicenseService, metricReporter *metricreport.Reporter, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager) *AuthService {
 	return &AuthService{
 		store:          store,
 		secret:         secret,
@@ -65,7 +61,6 @@ func NewAuthService(store *store.Store, secret string, licenseService enterprise
 		profile:        profile,
 		stateCfg:       stateCfg,
 		iamManager:     iamManager,
-		postCreateUser: postCreateUser,
 	}
 }
 
@@ -130,7 +125,7 @@ func (s *AuthService) Login(ctx context.Context, request *v1pb.LoginRequest) (*v
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to check user roles, error: %v", err)
 	}
-	if !isWorkspaceAdmin && loginUser.Type == base.EndUser && !mfaSecondLogin {
+	if !isWorkspaceAdmin && loginUser.Type == storepb.PrincipalType_END_USER && !mfaSecondLogin {
 		// Disallow password signin for end users.
 		if setting.DisallowPasswordSignin && !loginViaIDP {
 			return nil, status.Errorf(codes.PermissionDenied, "password signin is disallowed")
@@ -144,7 +139,7 @@ func (s *AuthService) Login(ctx context.Context, request *v1pb.LoginRequest) (*v
 	tokenDuration := auth.GetTokenDuration(ctx, s.store)
 	userMFAEnabled := loginUser.MFAConfig != nil && loginUser.MFAConfig.OtpSecret != ""
 	// We only allow MFA login (2-step) when the feature is enabled and user has enabled MFA.
-	if s.licenseService.IsFeatureEnabled(base.Feature2FA) == nil && !mfaSecondLogin && userMFAEnabled {
+	if s.licenseService.IsFeatureEnabled(v1pb.PlanFeature_FEATURE_TWO_FA) == nil && !mfaSecondLogin && userMFAEnabled {
 		mfaTempToken, err := auth.GenerateMFATempToken(loginUser.Name, loginUser.ID, s.profile.Mode, s.secret, tokenDuration)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to generate MFA temp token")
@@ -155,13 +150,13 @@ func (s *AuthService) Login(ctx context.Context, request *v1pb.LoginRequest) (*v
 	}
 
 	switch loginUser.Type {
-	case base.EndUser:
+	case storepb.PrincipalType_END_USER:
 		token, err := auth.GenerateAccessToken(loginUser.Name, loginUser.ID, s.profile.Mode, s.secret, tokenDuration)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to generate API access token")
 		}
 		response.Token = token
-	case base.ServiceAccount:
+	case storepb.PrincipalType_SERVICE_ACCOUNT:
 		token, err := auth.GenerateAPIToken(loginUser.Name, loginUser.ID, s.profile.Mode, s.secret)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to generate API access token")
@@ -212,10 +207,10 @@ func (s *AuthService) Login(ctx context.Context, request *v1pb.LoginRequest) (*v
 
 func (s *AuthService) needResetPassword(ctx context.Context, user *store.UserMessage) bool {
 	// Reset password restriction only works for end user with email & password login.
-	if user.Type != base.EndUser {
+	if user.Type != storepb.PrincipalType_END_USER {
 		return false
 	}
-	if err := s.licenseService.IsFeatureEnabled(base.FeaturePasswordRestriction); err != nil {
+	if err := s.licenseService.IsFeatureEnabled(v1pb.PlanFeature_FEATURE_PASSWORD_RESTRICTIONS); err != nil {
 		return false
 	}
 
@@ -229,7 +224,7 @@ func (s *AuthService) needResetPassword(ctx context.Context, user *store.UserMes
 		if !passwordRestriction.RequireResetPasswordForFirstLogin {
 			return false
 		}
-		count, err := s.store.CountUsers(ctx, base.EndUser)
+		count, err := s.store.CountUsers(ctx, storepb.PrincipalType_END_USER)
 		if err != nil {
 			slog.Error("failed to count end users", log.BBError(err))
 			return false
@@ -359,7 +354,7 @@ func (s *AuthService) getOrCreateUserWithIDP(ctx context.Context, request *v1pb.
 				BindPassword:     idpConfig.BindPassword,
 				BaseDN:           idpConfig.BaseDn,
 				UserFilter:       idpConfig.UserFilter,
-				SecurityProtocol: ldap.SecurityProtocol(idpConfig.SecurityProtocol),
+				SecurityProtocol: idpConfig.SecurityProtocol,
 				FieldMapping:     idpConfig.FieldMapping,
 			},
 		)
@@ -400,6 +395,9 @@ func (s *AuthService) getOrCreateUserWithIDP(ctx context.Context, request *v1pb.
 	}
 	if user != nil {
 		if user.MemberDeleted {
+			if err := s.userCountGuard(ctx); err != nil {
+				return nil, err
+			}
 			// Undelete the user when login via SSO.
 			user, err = s.store.UpdateUser(ctx, user, &store.UpdateUserMessage{Delete: &undeletePatch})
 			if err != nil {
@@ -416,7 +414,12 @@ func (s *AuthService) getOrCreateUserWithIDP(ctx context.Context, request *v1pb.
 		return user, nil
 	}
 
-	if err := s.licenseService.IsFeatureEnabled(base.FeatureSSO); err != nil {
+	// For expired license, we will only block new create creation and still allow SSO login from existing users.
+	featurePlan := v1pb.PlanFeature_FEATURE_ENTERPRISE_SSO
+	if idp.Type == storepb.IdentityProviderType_OAUTH2 && googleGitHubDomains[idp.Domain] {
+		featurePlan = v1pb.PlanFeature_FEATURE_GOOGLE_AND_GITHUB_SSO
+	}
+	if err := s.licenseService.IsFeatureEnabled(featurePlan); err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 	// Create new user from identity provider.
@@ -428,11 +431,14 @@ func (s *AuthService) getOrCreateUserWithIDP(ctx context.Context, request *v1pb.
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to generate password hash")
 	}
+	if err := s.userCountGuard(ctx); err != nil {
+		return nil, err
+	}
 	newUser, err := s.store.CreateUser(ctx, &store.UserMessage{
 		Name:         userInfo.DisplayName,
 		Email:        email,
 		Phone:        userInfo.Phone,
-		Type:         base.EndUser,
+		Type:         storepb.PrincipalType_END_USER,
 		PasswordHash: string(passwordHash),
 	})
 	if err != nil {
@@ -446,6 +452,19 @@ func (s *AuthService) getOrCreateUserWithIDP(ctx context.Context, request *v1pb.
 		}
 	}
 	return newUser, nil
+}
+
+func (s *AuthService) userCountGuard(ctx context.Context) error {
+	userLimit := s.licenseService.GetUserLimit(ctx)
+
+	count, err := s.store.CountActiveUsers(ctx)
+	if err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+	if count >= userLimit {
+		return status.Errorf(codes.ResourceExhausted, "reached the maximum user count %d", userLimit)
+	}
+	return nil
 }
 
 func challengeMFACode(user *store.UserMessage, mfaCode string) error {

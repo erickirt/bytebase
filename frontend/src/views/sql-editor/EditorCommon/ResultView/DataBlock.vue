@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-5 m-2">
+  <NScrollbar ref="scrollbarRef" class="space-y-5 m-2">
     <div
       v-for="(row, rowIndex) of rows"
       :key="`rows-${rowIndex + offset}`"
@@ -23,19 +23,12 @@
               v-if="isSensitiveColumn(header.index)"
               class="ml-0.5 shrink-0"
             />
-            <template v-else-if="isColumnMissingSensitive(header.index)">
-              <FeatureBadgeForInstanceLicense
-                v-if="hasSensitiveFeature"
-                :show="true"
-                custom-class="ml-0.5 shrink-0"
-                feature="bb.feature.sensitive-data"
-              />
-              <FeatureBadge
-                v-else
-                feature="bb.feature.sensitive-data"
-                custom-class="ml-0.5 shrink-0"
-              />
-            </template>
+            <FeatureBadge
+              v-else-if="isColumnMissingSensitive(header.index)"
+              :feature="PlanFeature.FEATURE_DATA_MASKING"
+              class="ml-0.5 shrink-0"
+              :instance="database.instanceResource"
+            />
             :
           </div>
           <div class="flex-1">
@@ -48,12 +41,13 @@
               :set-index="setIndex"
               :row-index="offset + rowIndex"
               :col-index="header.index"
+              :column-type="getColumnType(header)"
             />
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </NScrollbar>
   <div v-if="rows.length === 0" class="text-center w-full my-12 textinfolabel">
     {{ $t("sql-editor.no-data-available") }}
   </div>
@@ -61,15 +55,15 @@
 
 <script setup lang="ts">
 import type { Table } from "@tanstack/vue-table";
-import { computed } from "vue";
-import {
-  FeatureBadge,
-  FeatureBadgeForInstanceLicense,
-} from "@/components/FeatureGuard";
-import { useSubscriptionV1Store } from "@/store";
+import { NScrollbar } from "naive-ui";
+import { computed, watch, ref } from "vue";
+import { FeatureBadge } from "@/components/FeatureGuard";
+import { useConnectionOfCurrentSQLEditorTab } from "@/store";
 import type { QueryRow, RowValue } from "@/types/proto/v1/sql_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import TableCell from "./DataTable/TableCell.vue";
 import SensitiveDataIcon from "./DataTable/common/SensitiveDataIcon.vue";
+import { getColumnType } from "./DataTable/common/utils";
 import { useSQLResultViewContext } from "./context";
 
 const props = defineProps<{
@@ -81,11 +75,13 @@ const props = defineProps<{
 }>();
 
 const { keyword } = useSQLResultViewContext();
-const subscriptionStore = useSubscriptionV1Store();
+const { database } = useConnectionOfCurrentSQLEditorTab();
+const scrollbarRef = ref<InstanceType<typeof NScrollbar>>();
 
 const rows = computed(() => props.table.getRowModel().rows);
 
-const hasSensitiveFeature = computed(() => {
-  return subscriptionStore.hasFeature("bb.feature.sensitive-data");
-});
+watch(
+  () => props.offset,
+  () => scrollbarRef.value?.scrollTo({ top: 0 })
+);
 </script>

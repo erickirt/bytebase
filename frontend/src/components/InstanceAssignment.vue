@@ -13,7 +13,7 @@
               }}
             </div>
             <LearnMoreLink
-              url="https://www.bytebase.com/docs/administration/license?source=console"
+              url="https://docs.bytebase.com/administration/license?source=console"
               class="ml-1 text-sm"
             />
           </div>
@@ -244,10 +244,9 @@ const updateAssignment = async () => {
     }
     // activate instance
     instance.activation = true;
-    const composedInstance = await instanceV1Store.updateInstance(
-      Instance.fromPartial(instance),
-      ["activation"]
-    );
+    const composedInstance = await instanceV1Store.updateInstance(instance, [
+      "activation",
+    ]);
     databaseV1Store.updateDatabaseInstance(composedInstance);
   }
 

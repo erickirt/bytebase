@@ -17,7 +17,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/bytebase/bytebase/backend/api/auth"
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/component/config"
@@ -298,7 +297,7 @@ func getResourceFromRequest(request any, method string) ([]*common.Resource, err
 				return nil, errors.Wrapf(err, "failed to get projectID from %q", r.GetDatabase().GetProject())
 			}
 			// Allow to transfer databases to the default project.
-			if projectID == base.DefaultProjectID {
+			if projectID == common.DefaultProjectID {
 				continue
 			}
 			resources = append(resources, &common.Resource{Name: r.GetDatabase().GetProject()})
@@ -426,34 +425,4 @@ func toSnakeCase(str string) string {
 	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
 	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
 	return strings.ToLower(snake)
-}
-
-func getDatabaseMessage(ctx context.Context, s *store.Store, databaseResourceName string) (*store.DatabaseMessage, error) {
-	instanceID, databaseName, err := common.GetInstanceDatabaseID(databaseResourceName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse %q", databaseResourceName)
-	}
-
-	instance, err := s.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &instanceID})
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get instance %s", instanceID)
-	}
-	if instance == nil {
-		return nil, errors.Errorf("instance not found")
-	}
-
-	find := &store.FindDatabaseMessage{
-		InstanceID:      &instanceID,
-		DatabaseName:    &databaseName,
-		IsCaseSensitive: store.IsObjectCaseSensitive(instance),
-		ShowDeleted:     true,
-	}
-	database, err := s.GetDatabaseV2(ctx, find)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get database")
-	}
-	if database == nil {
-		return nil, errors.Errorf("database %q not found", databaseResourceName)
-	}
-	return database, nil
 }

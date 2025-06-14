@@ -125,8 +125,6 @@ export interface Changelist_Change {
    * 2) raw SQL if empty.
    */
   source: string;
-  /** The migration version for a change. */
-  version: string;
 }
 
 function createBaseCreateChangelistRequest(): CreateChangelistRequest {
@@ -716,7 +714,7 @@ export const Changelist: MessageFns<Changelist> = {
 };
 
 function createBaseChangelist_Change(): Changelist_Change {
-  return { sheet: "", source: "", version: "" };
+  return { sheet: "", source: "" };
 }
 
 export const Changelist_Change: MessageFns<Changelist_Change> = {
@@ -726,9 +724,6 @@ export const Changelist_Change: MessageFns<Changelist_Change> = {
     }
     if (message.source !== "") {
       writer.uint32(18).string(message.source);
-    }
-    if (message.version !== "") {
-      writer.uint32(26).string(message.version);
     }
     return writer;
   },
@@ -756,14 +751,6 @@ export const Changelist_Change: MessageFns<Changelist_Change> = {
           message.source = reader.string();
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.version = reader.string();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -777,7 +764,6 @@ export const Changelist_Change: MessageFns<Changelist_Change> = {
     return {
       sheet: isSet(object.sheet) ? globalThis.String(object.sheet) : "",
       source: isSet(object.source) ? globalThis.String(object.source) : "",
-      version: isSet(object.version) ? globalThis.String(object.version) : "",
     };
   },
 
@@ -789,9 +775,6 @@ export const Changelist_Change: MessageFns<Changelist_Change> = {
     if (message.source !== "") {
       obj.source = message.source;
     }
-    if (message.version !== "") {
-      obj.version = message.version;
-    }
     return obj;
   },
 
@@ -802,7 +785,6 @@ export const Changelist_Change: MessageFns<Changelist_Change> = {
     const message = createBaseChangelist_Change();
     message.sheet = object.sheet ?? "";
     message.source = object.source ?? "";
-    message.version = object.version ?? "";
     return message;
   },
 };

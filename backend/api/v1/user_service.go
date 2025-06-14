@@ -19,12 +19,11 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/component/config"
 	"github.com/bytebase/bytebase/backend/component/iam"
 	"github.com/bytebase/bytebase/backend/component/state"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	metricapi "github.com/bytebase/bytebase/backend/metric"
 	"github.com/bytebase/bytebase/backend/plugin/metric"
 	"github.com/bytebase/bytebase/backend/runner/metricreport"
@@ -39,16 +38,15 @@ type UserService struct {
 	v1pb.UnimplementedUserServiceServer
 	store          *store.Store
 	secret         string
-	licenseService enterprise.LicenseService
+	licenseService *enterprise.LicenseService
 	metricReporter *metricreport.Reporter
 	profile        *config.Profile
 	stateCfg       *state.State
 	iamManager     *iam.Manager
-	postCreateUser func(ctx context.Context, user *store.UserMessage, firstEndUser bool) error
 }
 
 // NewUserService creates a new UserService.
-func NewUserService(store *store.Store, secret string, licenseService enterprise.LicenseService, metricReporter *metricreport.Reporter, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager, postCreateUser func(ctx context.Context, user *store.UserMessage, firstEndUser bool) error) *UserService {
+func NewUserService(store *store.Store, secret string, licenseService *enterprise.LicenseService, metricReporter *metricreport.Reporter, profile *config.Profile, stateCfg *state.State, iamManager *iam.Manager) *UserService {
 	return &UserService{
 		store:          store,
 		secret:         secret,
@@ -57,7 +55,6 @@ func NewUserService(store *store.Store, secret string, licenseService enterprise
 		profile:        profile,
 		stateCfg:       stateCfg,
 		iamManager:     iamManager,
-		postCreateUser: postCreateUser,
 	}
 }
 
@@ -86,6 +83,19 @@ func (s *UserService) GetUser(ctx context.Context, request *v1pb.GetUserRequest)
 		return nil, status.Errorf(codes.NotFound, "user %d not found", userID)
 	}
 	return convertToUser(user), nil
+}
+
+// BatchGetUsers get users in batch.
+func (s *UserService) BatchGetUsers(ctx context.Context, request *v1pb.BatchGetUsersRequest) (*v1pb.BatchGetUsersResponse, error) {
+	response := &v1pb.BatchGetUsersResponse{}
+	for _, name := range request.Names {
+		user, err := s.GetUser(ctx, &v1pb.GetUserRequest{Name: name})
+		if err != nil {
+			return nil, err
+		}
+		response.Users = append(response.Users, user)
+	}
+	return response, nil
 }
 
 // GetCurrentUser gets the current authenticated user.
@@ -334,7 +344,7 @@ func (s *UserService) CreateUser(ctx context.Context, request *v1pb.CreateUserRe
 		return nil, status.Errorf(codes.InvalidArgument, "support user and service account only")
 	}
 
-	count, err := s.store.CountUsers(ctx, base.EndUser)
+	count, err := s.store.CountUsers(ctx, storepb.PrincipalType_END_USER)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to count users, error: %v", err)
 	}
@@ -346,7 +356,7 @@ func (s *UserService) CreateUser(ctx context.Context, request *v1pb.CreateUserRe
 		}
 	}
 
-	if err := validateEmailWithDomains(ctx, s.licenseService, s.store, request.User.Email, principalType == base.ServiceAccount, false); err != nil {
+	if err := validateEmailWithDomains(ctx, s.licenseService, s.store, request.User.Email, principalType == storepb.PrincipalType_SERVICE_ACCOUNT, false); err != nil {
 		return nil, err
 	}
 	existingUser, err := s.store.GetUserByEmail(ctx, request.User.Email)
@@ -363,7 +373,7 @@ func (s *UserService) CreateUser(ctx context.Context, request *v1pb.CreateUserRe
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to generate access key for service account.")
 		}
-		password = fmt.Sprintf("%s%s", base.ServiceAccountAccessKeyPrefix, pwd)
+		password = fmt.Sprintf("%s%s", common.ServiceAccountAccessKeyPrefix, pwd)
 	} else {
 		if password != "" {
 			if err := s.validatePassword(ctx, password); err != nil {
@@ -398,18 +408,14 @@ func (s *UserService) CreateUser(ctx context.Context, request *v1pb.CreateUserRe
 		// The first end user should be workspace admin.
 		updateRole := &store.PatchIamPolicyMessage{
 			Member: common.FormatUserUID(user.ID),
-			Roles:  []string{common.FormatRole(base.WorkspaceAdmin.String())},
+			Roles:  []string{common.FormatRole(common.WorkspaceAdmin)},
 		}
 		if _, err := s.store.PatchWorkspaceIamPolicy(ctx, updateRole); err != nil {
-			return nil, err
+			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
 
-	if err := s.postCreateUser(ctx, user, firstEndUser); err != nil {
-		return nil, err
-	}
-
-	isFirstUser := user.ID == base.PrincipalIDForFirstUser
+	isFirstUser := user.ID == common.PrincipalIDForFirstUser
 	s.metricReporter.Report(ctx, &metric.Metric{
 		Name:  metricapi.PrincipalRegistrationMetricName,
 		Value: 1,
@@ -496,7 +502,7 @@ func (s *UserService) UpdateUser(ctx context.Context, request *v1pb.UpdateUserRe
 	for _, path := range request.UpdateMask.Paths {
 		switch path {
 		case "email":
-			if err := validateEmailWithDomains(ctx, s.licenseService, s.store, request.User.Email, user.Type == base.ServiceAccount, false); err != nil {
+			if err := validateEmailWithDomains(ctx, s.licenseService, s.store, request.User.Email, user.Type == storepb.PrincipalType_SERVICE_ACCOUNT, false); err != nil {
 				return nil, err
 			}
 			existedUser, err := s.store.GetUserByEmail(ctx, request.User.Email)
@@ -510,7 +516,7 @@ func (s *UserService) UpdateUser(ctx context.Context, request *v1pb.UpdateUserRe
 		case "title":
 			patch.Name = &request.User.Title
 		case "password":
-			if user.Type != base.EndUser {
+			if user.Type != storepb.PrincipalType_END_USER {
 				return nil, status.Errorf(codes.InvalidArgument, "password can be mutated for end users only")
 			}
 			if err := s.validatePassword(ctx, request.User.Password); err != nil {
@@ -518,14 +524,14 @@ func (s *UserService) UpdateUser(ctx context.Context, request *v1pb.UpdateUserRe
 			}
 			passwordPatch = &request.User.Password
 		case "service_key":
-			if user.Type != base.ServiceAccount {
+			if user.Type != storepb.PrincipalType_SERVICE_ACCOUNT {
 				return nil, status.Errorf(codes.InvalidArgument, "service key can be mutated for service accounts only")
 			}
 			val, err := common.RandomString(20)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "failed to generate access key for service account.")
 			}
-			password := fmt.Sprintf("%s%s", base.ServiceAccountAccessKeyPrefix, val)
+			password := fmt.Sprintf("%s%s", common.ServiceAccountAccessKeyPrefix, val)
 			passwordPatch = &password
 		case "mfa_enabled":
 			if request.User.MfaEnabled {
@@ -685,7 +691,7 @@ func (s *UserService) getActiveUserCount(ctx context.Context) (int, error) {
 	}
 	activeEndUserCount := 0
 	for _, stat := range userStat {
-		if !stat.Deleted && stat.Type == base.EndUser {
+		if !stat.Deleted && stat.Type == storepb.PrincipalType_END_USER {
 			activeEndUserCount = stat.Count
 			break
 		}
@@ -694,19 +700,18 @@ func (s *UserService) getActiveUserCount(ctx context.Context) (int, error) {
 }
 
 func (s *UserService) hasExtraWorkspaceAdmin(ctx context.Context, policy *storepb.IamPolicy, userID int) (bool, error) {
-	workspaceAdminRole := common.FormatRole(base.WorkspaceAdmin.String())
+	workspaceAdminRole := common.FormatRole(common.WorkspaceAdmin)
 	userMember := common.FormatUserUID(userID)
-	systemBotMember := common.FormatUserUID(base.SystemBotID)
 
 	for _, binding := range policy.GetBindings() {
 		if binding.GetRole() != workspaceAdminRole {
 			continue
 		}
 		for _, member := range binding.GetMembers() {
-			if member == userMember || member == systemBotMember {
+			if member == userMember {
 				continue
 			}
-			if member == base.AllUsers {
+			if member == common.AllUsers {
 				activeEndUserCount, err := s.getActiveUserCount(ctx)
 				if err != nil {
 					return false, err
@@ -715,7 +720,7 @@ func (s *UserService) hasExtraWorkspaceAdmin(ctx context.Context, policy *storep
 			}
 			users := utils.GetUsersByMember(ctx, s.store, member)
 			for _, user := range users {
-				if !user.MemberDeleted && user.Type == base.EndUser {
+				if !user.MemberDeleted && user.Type == storepb.PrincipalType_END_USER {
 					return true, nil
 				}
 			}
@@ -764,13 +769,13 @@ func (s *UserService) UndeleteUser(ctx context.Context, request *v1pb.UndeleteUs
 	return convertToUser(user), nil
 }
 
-func convertToV1UserType(userType base.PrincipalType) v1pb.UserType {
+func convertToV1UserType(userType storepb.PrincipalType) v1pb.UserType {
 	switch userType {
-	case base.EndUser:
+	case storepb.PrincipalType_END_USER:
 		return v1pb.UserType_USER
-	case base.SystemBot:
+	case storepb.PrincipalType_SYSTEM_BOT:
 		return v1pb.UserType_SYSTEM_BOT
-	case base.ServiceAccount:
+	case storepb.PrincipalType_SERVICE_ACCOUNT:
 		return v1pb.UserType_SERVICE_ACCOUNT
 	default:
 		return v1pb.UserType_USER_TYPE_UNSPECIFIED
@@ -800,23 +805,23 @@ func convertToUser(user *store.UserMessage) *v1pb.User {
 	return convertedUser
 }
 
-func convertToPrincipalType(userType v1pb.UserType) (base.PrincipalType, error) {
-	var t base.PrincipalType
+func convertToPrincipalType(userType v1pb.UserType) (storepb.PrincipalType, error) {
+	var t storepb.PrincipalType
 	switch userType {
 	case v1pb.UserType_USER:
-		t = base.EndUser
+		t = storepb.PrincipalType_END_USER
 	case v1pb.UserType_SYSTEM_BOT:
-		t = base.SystemBot
+		t = storepb.PrincipalType_SYSTEM_BOT
 	case v1pb.UserType_SERVICE_ACCOUNT:
-		t = base.ServiceAccount
+		t = storepb.PrincipalType_SERVICE_ACCOUNT
 	default:
 		return t, status.Errorf(codes.InvalidArgument, "invalid user type %s", userType)
 	}
 	return t, nil
 }
 
-func validateEmailWithDomains(ctx context.Context, licenseService enterprise.LicenseService, stores *store.Store, email string, isServiceAccount bool, checkDomainSetting bool) error {
-	if licenseService.IsFeatureEnabled(base.FeatureDomainRestriction) != nil {
+func validateEmailWithDomains(ctx context.Context, licenseService *enterprise.LicenseService, stores *store.Store, email string, isServiceAccount bool, checkDomainSetting bool) error {
+	if licenseService.IsFeatureEnabled(v1pb.PlanFeature_FEATURE_USER_EMAIL_DOMAIN_RESTRICTION) != nil {
 		// nolint:nilerr
 		// feature not enabled, only validate email and skip domain restriction.
 		if err := validateEmail(email); err != nil {
@@ -916,7 +921,7 @@ func generateRecoveryCodes(n int) ([]string, error) {
 }
 
 func (s *UserService) userCountGuard(ctx context.Context) error {
-	userLimit := s.licenseService.GetPlanLimitValue(ctx, enterprise.PlanLimitMaximumUser)
+	userLimit := s.licenseService.GetUserLimit(ctx)
 
 	count, err := s.store.CountActiveUsers(ctx)
 	if err != nil {
@@ -934,5 +939,5 @@ func isUserWorkspaceAdmin(ctx context.Context, stores *store.Store, user *store.
 		return false, err
 	}
 	roles := utils.GetUserFormattedRolesMap(ctx, stores, user, workspacePolicy.Policy)
-	return roles[common.FormatRole(base.WorkspaceAdmin.String())], nil
+	return roles[common.FormatRole(common.WorkspaceAdmin)], nil
 }

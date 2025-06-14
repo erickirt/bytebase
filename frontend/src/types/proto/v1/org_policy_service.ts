@@ -129,8 +129,6 @@ export enum PolicyResourceType {
   WORKSPACE = "WORKSPACE",
   ENVIRONMENT = "ENVIRONMENT",
   PROJECT = "PROJECT",
-  INSTANCE = "INSTANCE",
-  DATABASE = "DATABASE",
   UNRECOGNIZED = "UNRECOGNIZED",
 }
 
@@ -148,12 +146,6 @@ export function policyResourceTypeFromJSON(object: any): PolicyResourceType {
     case 3:
     case "PROJECT":
       return PolicyResourceType.PROJECT;
-    case 4:
-    case "INSTANCE":
-      return PolicyResourceType.INSTANCE;
-    case 5:
-    case "DATABASE":
-      return PolicyResourceType.DATABASE;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -171,10 +163,6 @@ export function policyResourceTypeToJSON(object: PolicyResourceType): string {
       return "ENVIRONMENT";
     case PolicyResourceType.PROJECT:
       return "PROJECT";
-    case PolicyResourceType.INSTANCE:
-      return "INSTANCE";
-    case PolicyResourceType.DATABASE:
-      return "DATABASE";
     case PolicyResourceType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -191,10 +179,6 @@ export function policyResourceTypeToNumber(object: PolicyResourceType): number {
       return 2;
     case PolicyResourceType.PROJECT:
       return 3;
-    case PolicyResourceType.INSTANCE:
-      return 4;
-    case PolicyResourceType.DATABASE:
-      return 5;
     case PolicyResourceType.UNRECOGNIZED:
     default:
       return -1;
@@ -411,9 +395,11 @@ export interface QueryDataPolicy {
   timeout: Duration | undefined;
 }
 
+/** The SQL review rules. Check the SQL_REVIEW_RULES_DOCUMENTATION.md for details. */
 export interface SQLReviewRule {
   type: string;
   level: SQLReviewRuleLevel;
+  /** The payload is a JSON string that varies by rule type. */
   payload: string;
   engine: Engine;
   comment: string;
@@ -434,7 +420,24 @@ export interface MaskingExceptionPolicy_MaskingException {
    * - `group:{email}`: An email address for group.
    */
   member: string;
-  /** The condition that is associated with this exception policy instance. */
+  /**
+   * The condition that is associated with this exception policy instance.
+   * The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+   * If the condition is empty, means the user can access all databases without expiration.
+   *
+   * Support variables:
+   * resource.instance_id: the instance resource id. Only support "==" operation.
+   * resource.database_name: the database name. Only support "==" operation.
+   * resource.schema_name: the schema name. Only support "==" operation.
+   * resource.table_name: the table name. Only support "==" operation.
+   * resource.column_name: the column name. Only support "==" operation.
+   * request.time: the expiration. Only support "<" operation in `request.time < timestamp("{ISO datetime string format}")`
+   * All variables should join with "&&" condition.
+   *
+   * For example:
+   * resource.instance_id == "local" && resource.database_name == "employee" && request.time < timestamp("2025-04-30T11:10:39.000Z")
+   * resource.instance_id == "local" && resource.database_name == "employee"
+   */
   condition: Expr | undefined;
 }
 
@@ -504,6 +507,31 @@ export interface MaskingRulePolicy {
 export interface MaskingRulePolicy_MaskingRule {
   /** A unique identifier for a node in UUID format. */
   id: string;
+  /**
+   * The condition for the masking rule.
+   * The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+   *
+   * Support variables:
+   * environment_id: the environment resource id.
+   * project_id: the project resource id.
+   * instance_id: the instance resource id.
+   * database_name: the database name.
+   * table_name: the table name.
+   * column_name: the column name.
+   * classification_level: the classification level.
+   *
+   * Each variable support following operations:
+   * ==: the value equals the target.
+   * !=: the value not equals the target.
+   * in: the value matches one of the targets.
+   * !(in): the value not matches any of the targets.
+   *
+   * For example:
+   * environment_id == "test" && project_id == "sample-project"
+   * instance_id == "sample-instance" && database_name == "employee" && table_name in ["table1", "table2"]
+   * environment_id != "test" || !(project_id in ["poject1", "prject2"])
+   * instance_id == "sample-instance" && (database_name == "db1" || database_name == "db2")
+   */
   condition: Expr | undefined;
   semanticType: string;
 }

@@ -1,11 +1,11 @@
 <template>
-  <div class="w-full overflow-x-hidden space-y-4">
-    <FeatureAttention
+  <div class="w-full overflow-x-hidden space-y-4 pb-4">
+    <BBAttention
       v-if="remainingUserCount <= 3"
-      feature="bb.feature.user-count"
+      :type="'warning'"
+      :title="$t('subscription.usage.user-count.title')"
       :description="userCountAttention"
     />
-
     <NTabs v-model:value="state.typeTab" type="line" animated>
       <NTabPane name="USERS">
         <template #tab>
@@ -63,19 +63,16 @@
           <NButton
             v-if="allowGetSCIMSetting && allowCreateUser"
             class="capitalize"
+            :disabled="!hasDirectorySyncFeature"
             @click="
               () => {
-                if (!hasDirectorySyncFeature) {
-                  state.showFeatureModal = true;
-                  return;
-                }
                 state.showAadSyncDrawer = true;
               }
             "
           >
             <template #icon>
-              <SettingsIcon v-if="hasDirectorySyncFeature" class="h-5 w-5" />
-              <FeatureBadge v-else feature="bb.feature.directory-sync" />
+              <SettingsIcon class="h-5 w-5" />
+              <FeatureBadge :feature="PlanFeature.FEATURE_DIRECTORY_SYNC" />
             </template>
             {{ $t(`settings.members.entra-sync.self`) }}
           </NButton>
@@ -86,11 +83,15 @@
           >
             <template #trigger>
               <NButton
-                :disabled="workspaceProfileSetting.domains.length === 0"
+                :disabled="
+                  workspaceProfileSetting.domains.length === 0 ||
+                  !hasUserGroupFeature
+                "
                 @click="handleCreateGroup"
               >
                 <template #icon>
                   <PlusIcon class="h-5 w-5" />
+                  <FeatureBadge :feature="PlanFeature.FEATURE_USER_GROUPS" />
                 </template>
                 {{ $t(`settings.members.groups.add-group`) }}
               </NButton>
@@ -132,7 +133,7 @@
       <template v-if="state.showInactiveUserList">
         <div class="flex justify-between items-center mt-2 mb-4">
           <p class="text-lg font-medium leading-7">
-            <span>{{ $t("settings.members.inactive") }}</span>
+            <span>{{ $t("settings.members.inactive-users") }}</span>
             <span class="ml-1 font-normal text-control-light">
               ({{ inactiveUserCount }})
             </span>
@@ -176,23 +177,17 @@
     :show="state.showAadSyncDrawer"
     @close="state.showAadSyncDrawer = false"
   />
-
-  <FeatureModal
-    feature="bb.feature.directory-sync"
-    :open="state.showFeatureModal"
-    @cancel="state.showFeatureModal = false"
-  />
 </template>
 
 <script setup lang="ts">
 import { PlusIcon, SettingsIcon } from "lucide-vue-next";
-import { NButton, NTabs, NTabPane, NPopover, NCheckbox } from "naive-ui";
-import { computed, onMounted, reactive, watch, ref } from "vue";
+import { NButton, NCheckbox, NPopover, NTabPane, NTabs } from "naive-ui";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import type { ComponentExposed } from "vue-component-type-helpers";
 import { useI18n } from "vue-i18n";
-import { useRoute, useRouter, RouterLink } from "vue-router";
-import { FeatureBadge, FeatureModal } from "@/components/FeatureGuard";
-import { FeatureAttention } from "@/components/FeatureGuard";
+import { RouterLink, useRoute, useRouter } from "vue-router";
+import { BBAttention } from "@/bbkit";
+import { FeatureBadge } from "@/components/FeatureGuard";
 import AADSyncDrawer from "@/components/User/Settings/AADSyncDrawer.vue";
 import CreateGroupDrawer from "@/components/User/Settings/CreateGroupDrawer.vue";
 import CreateUserDrawer from "@/components/User/Settings/CreateUserDrawer.vue";
@@ -202,18 +197,19 @@ import { SearchBox } from "@/components/v2";
 import PagedTable from "@/components/v2/Model/PagedTable.vue";
 import { WORKSPACE_ROUTE_USER_PROFILE } from "@/router/dashboard/workspaceRoutes";
 import {
-  useUserStore,
-  useUIStateStore,
+  featureToRef,
+  useActuatorV1Store,
   useGroupStore,
   useSettingV1Store,
-  featureToRef,
   useSubscriptionV1Store,
-  useActuatorV1Store,
+  useUIStateStore,
+  useUserStore,
 } from "@/store";
 import { groupNamePrefix } from "@/store/modules/v1/common";
 import { State } from "@/types/proto/v1/common";
 import type { Group } from "@/types/proto/v1/group_service";
 import { WorkspaceProfileSetting } from "@/types/proto/v1/setting_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import { type User } from "@/types/proto/v1/user_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
 
@@ -231,7 +227,6 @@ type LocalState = {
   showCreateGroupDrawer: boolean;
   showAadSyncDrawer: boolean;
   editingGroup?: Group;
-  showFeatureModal: boolean;
 };
 
 const props = defineProps<{
@@ -246,7 +241,6 @@ const state = reactive<LocalState>({
   showCreateUserDrawer: false,
   showCreateGroupDrawer: false,
   showAadSyncDrawer: false,
-  showFeatureModal: false,
 });
 
 const { t } = useI18n();
@@ -328,7 +322,11 @@ const workspaceProfileSetting = computed(() =>
   )
 );
 
-const hasDirectorySyncFeature = featureToRef("bb.feature.directory-sync");
+const hasDirectorySyncFeature = featureToRef(
+  PlanFeature.FEATURE_DIRECTORY_SYNC
+);
+
+const hasUserGroupFeature = featureToRef(PlanFeature.FEATURE_USER_GROUPS);
 
 const allowGetSCIMSetting = computed(() =>
   hasWorkspacePermissionV2("bb.settings.get")
@@ -388,21 +386,16 @@ const remainingUserCount = computed((): number => {
 });
 
 const userCountAttention = computed((): string => {
-  const upgrade = t(
-    "dynamic.subscription.features.bb-feature-user-count.upgrade"
-  );
+  const upgrade = t("subscription.usage.user-count.upgrade");
   let status = "";
 
   if (remainingUserCount.value > 0) {
-    status = t(
-      "dynamic.subscription.features.bb-feature-user-count.remaining",
-      {
-        total: subscriptionV1Store.userCountLimit,
-        count: remainingUserCount.value,
-      }
-    );
+    status = t("subscription.usage.user-count.remaining", {
+      total: subscriptionV1Store.userCountLimit,
+      count: remainingUserCount.value,
+    });
   } else {
-    status = t("dynamic.subscription.features.bb-feature-user-count.runoutof", {
+    status = t("subscription.usage.user-count.runoutof", {
       total: subscriptionV1Store.userCountLimit,
     });
   }

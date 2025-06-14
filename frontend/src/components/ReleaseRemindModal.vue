@@ -1,12 +1,9 @@
 <template>
-  <BBModal
-    :title="$t('settings.release.new-version-available')"
-    @close="onClose"
-  >
+  <BBModal :title="$t('remind.release.new-version-available')" @close="onClose">
     <div class="min-w-0 md:min-w-400">
       <div>
         <p class="whitespace-pre-wrap">
-          <i18n-t keypath="settings.release.new-version-content">
+          <i18n-t keypath="remind.release.new-version-content">
             <template #tag>
               <a
                 class="font-bold underline"
@@ -44,7 +41,7 @@ const subscriptionStore = useSubscriptionV1Store();
 
 const link = computed(() => {
   if (subscriptionStore.isSelfHostLicense) {
-    return "https://www.bytebase.com/docs/get-started/self-host";
+    return "https://docs.bytebase.com/get-started/self-host";
   }
   return subscriptionStore.purchaseLicenseUrl;
 });

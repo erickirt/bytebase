@@ -9,7 +9,7 @@
           <div class="text-sm text-control-light">
             {{ $t(`settings.members.entra-sync.description`) }}
             <LearnMoreLink
-              url="https://www.bytebase.com/docs/administration/scim/overview?source=console"
+              url="https://docs.bytebase.com/administration/scim/overview?source=console"
               class="ml-1"
             />
           </div>
@@ -121,6 +121,7 @@ import LearnMoreLink from "@/components/LearnMoreLink.vue";
 import { Drawer, DrawerContent } from "@/components/v2";
 import { SETTING_ROUTE_WORKSPACE_GENERAL } from "@/router/dashboard/workspaceSetting";
 import { pushNotification, useSettingV1Store } from "@/store";
+import { Setting_SettingName } from "@/types/proto/v1/setting_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
 
 defineProps<{
@@ -144,7 +145,8 @@ const hasPermission = computed(() =>
 
 const workspaceId = computed(() => {
   return (
-    settingV1Store.getSettingByName("bb.workspace.id")?.value?.stringValue ?? ""
+    settingV1Store.getSettingByName(Setting_SettingName.WORKSPACE_ID)?.value
+      ?.stringValue ?? ""
   );
 });
 
@@ -161,8 +163,8 @@ const scimUrl = computed(() => {
 
 const scimToken = computed(() => {
   return (
-    settingV1Store.getSettingByName("bb.workspace.scim")?.value?.scimSetting
-      ?.token ?? ""
+    settingV1Store.getSettingByName(Setting_SettingName.SCIM)?.value
+      ?.scimSetting?.token ?? ""
   );
 });
 
@@ -206,7 +208,7 @@ const resetToken = () => {
     onPositiveClick: () => {
       settingV1Store
         .upsertSetting({
-          name: "bb.workspace.scim",
+          name: Setting_SettingName.SCIM,
           value: {
             scimSetting: {
               token: "",

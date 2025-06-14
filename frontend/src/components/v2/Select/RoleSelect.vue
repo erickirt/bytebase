@@ -1,7 +1,7 @@
 <template>
   <NSelect
     v-bind="$attrs"
-    :value="value"
+    :value="value ? value : undefined"
     :multiple="multiple"
     :disabled="disabled"
     :clearable="clearable"
@@ -13,7 +13,7 @@
     @update:value="onValueUpdate"
   />
   <FeatureModal
-    feature="bb.feature.custom-role"
+    :feature="PlanFeature.FEATURE_CUSTOM_ROLES"
     :open="showFeatureModal"
     @cancel="showFeatureModal = false"
   />
@@ -27,11 +27,11 @@ import FeatureBadge from "@/components/FeatureGuard/FeatureBadge.vue";
 import FeatureModal from "@/components/FeatureGuard/FeatureModal.vue";
 import { t } from "@/plugins/i18n";
 import { useAppFeature, useRoleStore, featureToRef } from "@/store";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import {
   PRESET_PROJECT_ROLES,
   PRESET_ROLES,
   PRESET_WORKSPACE_ROLES,
-  PresetRoleType,
 } from "@/types";
 import { displayRoleTitle } from "@/utils";
 
@@ -44,6 +44,7 @@ const props = withDefaults(
     suffix?: string;
     includeWorkspaceRoles?: boolean;
     size?: "tiny" | "small" | "medium" | "large";
+    supportRoles?: string[];
   }>(),
   {
     clearable: true,
@@ -55,6 +56,7 @@ const props = withDefaults(
         "role.project-roles.apply-to-all-projects"
       ).toLocaleLowerCase()})`,
     size: "medium",
+    supportRoles: () => [],
   }
 );
 
@@ -65,40 +67,46 @@ const emit = defineEmits<{
 const roleStore = useRoleStore();
 const hideProjectRoles = useAppFeature("bb.feature.members.hide-project-roles");
 const showFeatureModal = ref(false);
-const hasCustomRoleFeature = featureToRef("bb.feature.custom-role");
+const hasCustomRoleFeature = featureToRef(PlanFeature.FEATURE_CUSTOM_ROLES);
+
+const filterRole = (role: string) => {
+  if (!props.supportRoles || props.supportRoles.length === 0) {
+    return true;
+  }
+  return props.supportRoles.includes(role);
+};
 
 const availableRoleOptions = computed(
   (): (SelectOption | SelectGroupOption)[] => {
-    const roleGroups = [
-      {
-        type: "group",
-        key: "project-roles",
-        label: t("role.project-roles.self") + props.suffix,
-        children: PRESET_PROJECT_ROLES.map((role) => ({
-          label: displayRoleTitle(role),
-          value: role,
-        })),
-      },
-    ];
+    const roleGroups: SelectGroupOption[] = [];
+
     if (props.includeWorkspaceRoles) {
-      roleGroups.unshift({
+      roleGroups.push({
         type: "group",
         key: "workspace-roles",
         label: t("role.workspace-roles.self"),
-        children: PRESET_WORKSPACE_ROLES.filter(
-          (role) => role !== PresetRoleType.WORKSPACE_MEMBER
-        ).map((role) => ({
+        children: PRESET_WORKSPACE_ROLES.filter(filterRole).map((role) => ({
           label: displayRoleTitle(role),
           value: role,
         })),
       });
     }
-    if (hideProjectRoles.value) {
-      return roleGroups[0].children;
+
+    if (!hideProjectRoles.value) {
+      roleGroups.push({
+        type: "group",
+        key: "project-roles",
+        label: t("role.project-roles.self") + props.suffix,
+        children: PRESET_PROJECT_ROLES.filter(filterRole).map((role) => ({
+          label: displayRoleTitle(role),
+          value: role,
+        })),
+      });
     }
+
     const customRoles = roleStore.roleList
       .map((role) => role.name)
-      .filter((role) => !PRESET_ROLES.includes(role));
+      .filter((role) => !PRESET_ROLES.includes(role) && filterRole(role));
     if (customRoles.length > 0) {
       roleGroups.push({
         type: "group",
@@ -110,6 +118,7 @@ const availableRoleOptions = computed(
         })),
       });
     }
+
     return roleGroups;
   }
 );
@@ -124,7 +133,7 @@ const renderLabel = (option: SelectOption) => {
   }
 
   const icon = h(FeatureBadge, {
-    feature: "bb.feature.custom-approval",
+    feature: PlanFeature.FEATURE_CUSTOM_ROLES,
     clickable: false,
   });
   return h(

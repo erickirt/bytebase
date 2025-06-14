@@ -8,13 +8,12 @@ import {
 } from "@/types/proto/v1/plan_service";
 import { Advice_Status, type Advice } from "@/types/proto/v1/sql_service";
 import { extractPlanCheckRunUID } from "@/utils";
-import { planCheckRunListForSpec, type PlanContext } from "../../logic";
 
 export const useSQLAdviceMarkers = (
-  context: PlanContext,
-  advices: Ref<Advice[] | undefined> | undefined
+  isCreating: Ref<boolean>,
+  planCheckRunList?: Ref<PlanCheckRun[]>,
+  advices?: Ref<Advice[] | undefined>
 ) => {
-  const { isCreating } = context;
   const markers = computed(() => {
     if (isCreating.value) {
       if (!advices) return [];
@@ -34,17 +33,14 @@ export const useSQLAdviceMarkers = (
         };
       });
     } else {
-      const { plan, selectedSpec } = context;
-      const planCheckRunList = planCheckRunListForSpec(
-        plan.value,
-        selectedSpec.value
-      );
+      if (!planCheckRunList) return [];
+      if (!planCheckRunList.value) return [];
       const types: PlanCheckRun_Type[] = [
         PlanCheckRun_Type.DATABASE_STATEMENT_ADVISE,
       ];
       return types.flatMap((type) => {
         return getLatestAdviceOptions(
-          planCheckRunList.filter((checkRun) => checkRun.type === type)
+          planCheckRunList.value.filter((checkRun) => checkRun.type === type)
         );
       });
     }

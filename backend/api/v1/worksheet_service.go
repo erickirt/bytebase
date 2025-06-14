@@ -67,32 +67,16 @@ func (s *WorksheetService) CreateWorksheet(ctx context.Context, request *v1pb.Cr
 
 	var database *store.DatabaseMessage
 	if request.Worksheet.Database != "" {
-		instanceResourceID, databaseName, err := common.GetInstanceDatabaseID(request.Worksheet.Database)
+		db, err := getDatabaseMessage(ctx, s.store, request.Worksheet.Database)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
 		}
-		instance, err := s.store.GetInstanceV2(ctx, &store.FindInstanceMessage{
-			ResourceID: &instanceResourceID,
-		})
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get instance with resource id %q, err: %v", instanceResourceID, err)
-		}
-		if instance == nil {
-			return nil, status.Errorf(codes.NotFound, "instance with resource id %q not found", instanceResourceID)
-		}
-
-		find := &store.FindDatabaseMessage{
-			ProjectID:       &projectResourceID,
-			InstanceID:      &instanceResourceID,
-			DatabaseName:    &databaseName,
-			IsCaseSensitive: store.IsObjectCaseSensitive(instance),
-		}
-		db, err := s.store.GetDatabaseV2(ctx, find)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get database with name %q, err: %v", databaseName, err)
+		// Verify the database belongs to the specified project
+		if db.ProjectID != projectResourceID {
+			return nil, status.Errorf(codes.NotFound, "database %q not found in project %q", request.Worksheet.Database, projectResourceID)
 		}
 		if db == nil {
-			return nil, status.Errorf(codes.NotFound, "database with name %q not found in project %q instance %q", databaseName, projectResourceID, instanceResourceID)
+			return nil, status.Errorf(codes.NotFound, "database %q not found", request.Worksheet.Database)
 		}
 		database = db
 	}
@@ -379,19 +363,12 @@ func (s *WorksheetService) UpdateWorksheet(ctx context.Context, request *v1pb.Up
 			stringVisibility := string(visibility)
 			worksheetPatch.Visibility = &stringVisibility
 		case "database":
-			instanceID, databaseName, err := common.GetInstanceDatabaseID(request.Worksheet.Database)
+			database, err := getDatabaseMessage(ctx, s.store, request.Worksheet.Database)
 			if err != nil {
-				return nil, status.Error(codes.InvalidArgument, err.Error())
+				return nil, status.Errorf(codes.Internal, "failed to found database %v", request.Worksheet.Database)
 			}
-			database, err := s.store.GetDatabaseV2(ctx, &store.FindDatabaseMessage{
-				InstanceID:   &instanceID,
-				DatabaseName: &databaseName,
-			})
-			if err != nil {
-				return nil, status.Error(codes.Internal, err.Error())
-			}
-			if database == nil {
-				return nil, status.Errorf(codes.InvalidArgument, `database "%q" not found`, request.Worksheet.Database)
+			if database == nil || database.Deleted {
+				return nil, status.Errorf(codes.NotFound, "database %v not found", request.Worksheet.Database)
 			}
 			worksheetPatch.InstanceID, worksheetPatch.DatabaseName = &database.InstanceID, &database.DatabaseName
 		default:
@@ -471,7 +448,7 @@ func (s *WorksheetService) UpdateWorksheetOrganizer(ctx context.Context, request
 		return nil, err
 	}
 
-	ok, err := s.canWriteWorksheet(ctx, worksheet)
+	ok, err := s.canReadWorksheet(ctx, worksheet)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to check access with error: %v", err)
 	}

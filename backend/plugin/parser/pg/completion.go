@@ -3,8 +3,9 @@ package pg
 import (
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/antlr4-go/antlr/v4"
 	pg "github.com/bytebase/postgresql-parser"
@@ -175,6 +176,7 @@ func NewTrickyCompleter(ctx context.Context, cCtx base.CompletionContext, statem
 	// For all PostgreSQL completers, we use one global follow sets by state.
 	// The FollowSetsByState is the thread-safe struct.
 	core := base.NewCodeCompletionCore(
+		ctx,
 		parser,
 		newIgnoredTokens(),
 		newPreferredRules(),
@@ -210,6 +212,7 @@ func NewStandardCompleter(ctx context.Context, cCtx base.CompletionContext, stat
 	// For all PostgreSQL completers, we use one global follow sets by state.
 	// The FollowSetsByState is the thread-safe struct.
 	core := base.NewCodeCompletionCore(
+		ctx,
 		parser,
 		newIgnoredTokens(),
 		newPreferredRules(),
@@ -440,11 +443,20 @@ func (m CompletionMap) toSlice() []base.Candidate {
 	for _, candidate := range m {
 		result = append(result, candidate)
 	}
-	sort.Slice(result, func(i, j int) bool {
-		if result[i].Type != result[j].Type {
-			return result[i].Type < result[j].Type
+	slices.SortFunc(result, func(a, b base.Candidate) int {
+		if a.Type != b.Type {
+			if a.Type < b.Type {
+				return -1
+			}
+			return 1
 		}
-		return result[i].Text < result[j].Text
+		if a.Text < b.Text {
+			return -1
+		}
+		if a.Text > b.Text {
+			return 1
+		}
+		return 0
 	})
 	return result
 }
@@ -756,9 +768,7 @@ func (c *Completer) fetchSelectItemAliases(ruleStack []*base.RuleContext) []stri
 			for alias := range aliasMap {
 				result = append(result, alias)
 			}
-			sort.Slice(result, func(i, j int) bool {
-				return result[i] < result[j]
-			})
+			slices.Sort(result)
 			return result
 		case pg.PostgreSQLParserRULE_opt_sort_clause, pg.PostgreSQLParserRULE_group_clause, pg.PostgreSQLParserRULE_having_clause:
 			canUseAliases = true
@@ -839,7 +849,7 @@ func (c *Completer) determineQualifiedName() (string, ObjectFlags) {
 	qualifier := ""
 	temp := ""
 	if c.lexer.IsIdentifier(c.scanner.GetTokenType()) {
-		temp = unquote(c.scanner.GetTokenText())
+		temp = normalizeIdentifier(c.scanner.GetTokenText())
 		c.scanner.Forward(true /* skipHidden */)
 	}
 
@@ -884,7 +894,7 @@ func (c *Completer) determineColumnRef() (schema, table string, flags ObjectFlag
 	table = ""
 	temp := ""
 	if c.lexer.IsIdentifier(c.scanner.GetTokenType()) {
-		temp = unquote(c.scanner.GetTokenText())
+		temp = normalizeIdentifier(c.scanner.GetTokenText())
 		c.scanner.Forward(true /* skipHidden */)
 	}
 
@@ -896,7 +906,7 @@ func (c *Completer) determineColumnRef() (schema, table string, flags ObjectFlag
 	table = temp
 	schema = temp
 	if c.lexer.IsIdentifier(c.scanner.GetTokenType()) {
-		temp = unquote(c.scanner.GetTokenText())
+		temp = normalizeIdentifier(c.scanner.GetTokenText())
 		c.scanner.Forward(true /* skipHidden */)
 
 		if !c.scanner.IsTokenType(pg.PostgreSQLLexerDOT) || position <= c.scanner.GetIndex() {
@@ -908,6 +918,13 @@ func (c *Completer) determineColumnRef() (schema, table string, flags ObjectFlag
 	}
 
 	return schema, table, ObjectFlagsShowTables | ObjectFlagsShowColumns
+}
+
+func normalizeIdentifier(tokenText string) string {
+	if len(tokenText) >= 2 && tokenText[0] == '"' && tokenText[len(tokenText)-1] == '"' {
+		return normalizePostgreSQLQuotedIdentifier(tokenText)
+	}
+	return unquote(tokenText)
 }
 
 func unquote(s string) string {
@@ -1190,17 +1207,21 @@ func skipHeadingSQLs(statement string, caretLine int, caretOffset int) (string, 
 
 	start := 0
 	for i, sql := range list {
-		if sql.LastLine > caretLine || (sql.LastLine == caretLine && sql.LastColumn >= caretOffset) {
+		sqlEndLine := int(sql.End.GetLine())
+		sqlEndColumn := int(sql.End.GetColumn())
+		if sqlEndLine > caretLine || (sqlEndLine == caretLine && sqlEndColumn >= caretOffset) {
 			start = i
 			if i == 0 {
-				// If the caret is in the first SQL statement, we should not skip any SQL statements.
+				// The caret is in the first SQL statement, so we don't need to skip any SQL statements.
 				break
 			}
-			newCaretLine = caretLine - list[i-1].LastLine + 1 // Convert to 1-based.
-			if caretLine == list[i-1].LastLine {
+			previousSQLEndLine := int(list[i-1].End.GetLine())
+			previousSQLEndColumn := int(list[i-1].End.GetColumn())
+			newCaretLine = caretLine - previousSQLEndLine + 1 // Convert to 1-based.
+			if caretLine == previousSQLEndLine {
 				// The caret is in the same line as the last line of the previous SQL statement.
 				// We need to adjust the caret offset.
-				newCaretOffset = caretOffset - list[i-1].LastColumn - 1 // Convert to 0-based.
+				newCaretOffset = caretOffset - previousSQLEndColumn - 1 // Convert to 0-based.
 			}
 			break
 		}
@@ -1334,5 +1355,38 @@ func (c *Completer) quotedIdentifierIfNeeded(s string) string {
 	if c.lexer.IsReservedKeyword(strings.ToUpper(s)) {
 		return fmt.Sprintf(`"%s"`, s)
 	}
+	// PostgreSQL requires double quotes for identifiers with special characters or start with digits
+	if !isValidUnquotedIdentifier(s) {
+		// If the identifier contains double quotes, we need to escape them by doubling them
+		if strings.Contains(s, `"`) {
+			s = strings.ReplaceAll(s, `"`, `""`)
+		}
+		return fmt.Sprintf(`"%s"`, s)
+	}
 	return s
+}
+
+// isValidUnquotedIdentifier checks if the identifier can be used without quotes in PostgreSQL.
+// PostgreSQL unquoted identifiers must:
+// - Begin with a letter (a-z, A-Z) or underscore
+// - Contain only letters, digits, and underscores
+func isValidUnquotedIdentifier(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+
+	// First character must be a letter or underscore
+	first := rune(s[0])
+	if !unicode.IsLetter(first) && first != '_' {
+		return false
+	}
+
+	// Remaining characters must be letters, digits, or underscores
+	for _, ch := range s[1:] {
+		if !unicode.IsLetter(ch) && !unicode.IsDigit(ch) && ch != '_' {
+			return false
+		}
+	}
+
+	return true
 }

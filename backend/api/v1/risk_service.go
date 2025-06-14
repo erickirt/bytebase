@@ -8,9 +8,8 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	"github.com/bytebase/bytebase/backend/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
@@ -19,11 +18,11 @@ import (
 type RiskService struct {
 	v1pb.UnimplementedRiskServiceServer
 	store          *store.Store
-	licenseService enterprise.LicenseService
+	licenseService *enterprise.LicenseService
 }
 
 // NewRiskService creates a new RiskService.
-func NewRiskService(store *store.Store, licenseService enterprise.LicenseService) *RiskService {
+func NewRiskService(store *store.Store, licenseService *enterprise.LicenseService) *RiskService {
 	return &RiskService{
 		store:          store,
 		licenseService: licenseService,
@@ -33,7 +32,7 @@ func NewRiskService(store *store.Store, licenseService enterprise.LicenseService
 func convertToRisk(risk *store.RiskMessage) (*v1pb.Risk, error) {
 	return &v1pb.Risk{
 		Name:      fmt.Sprintf("%s%v", common.RiskPrefix, risk.ID),
-		Source:    convertToV1Source(risk.Source),
+		Source:    ConvertToV1Source(risk.Source),
 		Title:     risk.Name,
 		Level:     risk.Level,
 		Condition: risk.Expression,
@@ -58,9 +57,18 @@ func (s *RiskService) ListRisks(ctx context.Context, _ *v1pb.ListRisksRequest) (
 	return response, nil
 }
 
+// GetRisk gets the risk.
+func (s *RiskService) GetRisk(ctx context.Context, request *v1pb.GetRiskRequest) (*v1pb.Risk, error) {
+	risk, err := s.getRiskByName(ctx, request.Name)
+	if err != nil {
+		return nil, err
+	}
+	return convertToRisk(risk)
+}
+
 // CreateRisk creates a risk.
 func (s *RiskService) CreateRisk(ctx context.Context, request *v1pb.CreateRiskRequest) (*v1pb.Risk, error) {
-	if err := s.licenseService.IsFeatureEnabled(base.FeatureCustomApproval); err != nil {
+	if err := s.licenseService.IsFeatureEnabled(v1pb.PlanFeature_FEATURE_RISK_ASSESSMENT); err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 	// Validate the condition.
@@ -83,22 +91,15 @@ func (s *RiskService) CreateRisk(ctx context.Context, request *v1pb.CreateRiskRe
 
 // UpdateRisk updates a risk.
 func (s *RiskService) UpdateRisk(ctx context.Context, request *v1pb.UpdateRiskRequest) (*v1pb.Risk, error) {
-	if err := s.licenseService.IsFeatureEnabled(base.FeatureCustomApproval); err != nil {
+	if err := s.licenseService.IsFeatureEnabled(v1pb.PlanFeature_FEATURE_RISK_ASSESSMENT); err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 	if request.UpdateMask == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "update_mask must be set")
 	}
-	riskID, err := common.GetRiskID(request.Risk.Name)
+	risk, err := s.getRiskByName(ctx, request.Risk.Name)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-	risk, err := s.store.GetRisk(ctx, riskID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get risk, error: %v", err)
-	}
-	if risk == nil {
-		return nil, status.Errorf(codes.NotFound, "risk %v not found", request.Risk.Name)
+		return nil, err
 	}
 
 	patch := &store.UpdateRiskMessage{}
@@ -123,7 +124,7 @@ func (s *RiskService) UpdateRisk(ctx context.Context, request *v1pb.UpdateRiskRe
 		}
 	}
 
-	risk, err = s.store.UpdateRisk(ctx, patch, riskID)
+	risk, err = s.store.UpdateRisk(ctx, patch, risk.ID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -137,13 +138,6 @@ func (s *RiskService) DeleteRisk(ctx context.Context, request *v1pb.DeleteRiskRe
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	risk, err := s.store.GetRisk(ctx, riskID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get risk, error: %v", err)
-	}
-	if risk == nil {
-		return nil, status.Errorf(codes.NotFound, "risk %v not found", request.Name)
-	}
 
 	if err := s.store.DeleteRisk(ctx, riskID); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -152,7 +146,22 @@ func (s *RiskService) DeleteRisk(ctx context.Context, request *v1pb.DeleteRiskRe
 	return &emptypb.Empty{}, nil
 }
 
-func convertToV1Source(source store.RiskSource) v1pb.Risk_Source {
+func (s *RiskService) getRiskByName(ctx context.Context, name string) (*store.RiskMessage, error) {
+	riskID, err := common.GetRiskID(name)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	risk, err := s.store.GetRisk(ctx, riskID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get risk, error: %v", err)
+	}
+	if risk == nil {
+		return nil, status.Errorf(codes.NotFound, "risk %v not found", name)
+	}
+	return risk, nil
+}
+
+func ConvertToV1Source(source store.RiskSource) v1pb.Risk_Source {
 	switch source {
 	case store.RiskSourceDatabaseCreate:
 		return v1pb.Risk_CREATE_DATABASE
@@ -160,12 +169,10 @@ func convertToV1Source(source store.RiskSource) v1pb.Risk_Source {
 		return v1pb.Risk_DDL
 	case store.RiskSourceDatabaseDataUpdate:
 		return v1pb.Risk_DML
-	case store.RiskRequestQuery:
-		return v1pb.Risk_REQUEST_QUERY
-	case store.RiskRequestExport:
-		return v1pb.Risk_REQUEST_EXPORT
 	case store.RiskSourceDatabaseDataExport:
 		return v1pb.Risk_DATA_EXPORT
+	case store.RiskRequestRole:
+		return v1pb.Risk_REQUEST_ROLE
 	}
 	return v1pb.Risk_SOURCE_UNSPECIFIED
 }
@@ -178,12 +185,10 @@ func convertToSource(source v1pb.Risk_Source) store.RiskSource {
 		return store.RiskSourceDatabaseSchemaUpdate
 	case v1pb.Risk_DML:
 		return store.RiskSourceDatabaseDataUpdate
-	case v1pb.Risk_REQUEST_QUERY:
-		return store.RiskRequestQuery
-	case v1pb.Risk_REQUEST_EXPORT:
-		return store.RiskRequestExport
 	case v1pb.Risk_DATA_EXPORT:
 		return store.RiskSourceDatabaseDataExport
+	case v1pb.Risk_REQUEST_ROLE:
+		return store.RiskRequestRole
 	}
 	return store.RiskSourceUnknown
 }

@@ -32,9 +32,8 @@ const (
 	Risk_DDL                Risk_Source = 1
 	Risk_DML                Risk_Source = 2
 	Risk_CREATE_DATABASE    Risk_Source = 3
-	Risk_REQUEST_QUERY      Risk_Source = 4
-	Risk_REQUEST_EXPORT     Risk_Source = 5
 	Risk_DATA_EXPORT        Risk_Source = 6
+	Risk_REQUEST_ROLE       Risk_Source = 7
 )
 
 // Enum value maps for Risk_Source.
@@ -44,18 +43,16 @@ var (
 		1: "DDL",
 		2: "DML",
 		3: "CREATE_DATABASE",
-		4: "REQUEST_QUERY",
-		5: "REQUEST_EXPORT",
 		6: "DATA_EXPORT",
+		7: "REQUEST_ROLE",
 	}
 	Risk_Source_value = map[string]int32{
 		"SOURCE_UNSPECIFIED": 0,
 		"DDL":                1,
 		"DML":                2,
 		"CREATE_DATABASE":    3,
-		"REQUEST_QUERY":      4,
-		"REQUEST_EXPORT":     5,
 		"DATA_EXPORT":        6,
+		"REQUEST_ROLE":       7,
 	}
 )
 
@@ -83,7 +80,7 @@ func (x Risk_Source) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Risk_Source.Descriptor instead.
 func (Risk_Source) EnumDescriptor() ([]byte, []int) {
-	return file_v1_risk_service_proto_rawDescGZIP(), []int{5, 0}
+	return file_v1_risk_service_proto_rawDescGZIP(), []int{6, 0}
 }
 
 type ListRisksRequest struct {
@@ -248,6 +245,52 @@ func (x *CreateRiskRequest) GetRisk() *Risk {
 	return nil
 }
 
+type GetRiskRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The name of the risk to retrieve.
+	// Format: risks/{risk}
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRiskRequest) Reset() {
+	*x = GetRiskRequest{}
+	mi := &file_v1_risk_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRiskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRiskRequest) ProtoMessage() {}
+
+func (x *GetRiskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_risk_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRiskRequest.ProtoReflect.Descriptor instead.
+func (*GetRiskRequest) Descriptor() ([]byte, []int) {
+	return file_v1_risk_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetRiskRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 type UpdateRiskRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The risk to update.
@@ -263,7 +306,7 @@ type UpdateRiskRequest struct {
 
 func (x *UpdateRiskRequest) Reset() {
 	*x = UpdateRiskRequest{}
-	mi := &file_v1_risk_service_proto_msgTypes[3]
+	mi := &file_v1_risk_service_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -275,7 +318,7 @@ func (x *UpdateRiskRequest) String() string {
 func (*UpdateRiskRequest) ProtoMessage() {}
 
 func (x *UpdateRiskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_risk_service_proto_msgTypes[3]
+	mi := &file_v1_risk_service_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -288,7 +331,7 @@ func (x *UpdateRiskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRiskRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRiskRequest) Descriptor() ([]byte, []int) {
-	return file_v1_risk_service_proto_rawDescGZIP(), []int{3}
+	return file_v1_risk_service_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *UpdateRiskRequest) GetRisk() *Risk {
@@ -316,7 +359,7 @@ type DeleteRiskRequest struct {
 
 func (x *DeleteRiskRequest) Reset() {
 	*x = DeleteRiskRequest{}
-	mi := &file_v1_risk_service_proto_msgTypes[4]
+	mi := &file_v1_risk_service_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -328,7 +371,7 @@ func (x *DeleteRiskRequest) String() string {
 func (*DeleteRiskRequest) ProtoMessage() {}
 
 func (x *DeleteRiskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_risk_service_proto_msgTypes[4]
+	mi := &file_v1_risk_service_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -341,7 +384,7 @@ func (x *DeleteRiskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRiskRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRiskRequest) Descriptor() ([]byte, []int) {
-	return file_v1_risk_service_proto_rawDescGZIP(), []int{4}
+	return file_v1_risk_service_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *DeleteRiskRequest) GetName() string {
@@ -354,19 +397,91 @@ func (x *DeleteRiskRequest) GetName() string {
 type Risk struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Format: risks/{risk}
-	Name          string      `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Source        Risk_Source `protobuf:"varint,3,opt,name=source,proto3,enum=bytebase.v1.Risk_Source" json:"source,omitempty"`
-	Title         string      `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
-	Level         int32       `protobuf:"varint,5,opt,name=level,proto3" json:"level,omitempty"`
-	Active        bool        `protobuf:"varint,7,opt,name=active,proto3" json:"active,omitempty"`
-	Condition     *expr.Expr  `protobuf:"bytes,8,opt,name=condition,proto3" json:"condition,omitempty"`
+	Name   string      `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Source Risk_Source `protobuf:"varint,3,opt,name=source,proto3,enum=bytebase.v1.Risk_Source" json:"source,omitempty"`
+	Title  string      `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
+	Level  int32       `protobuf:"varint,5,opt,name=level,proto3" json:"level,omitempty"`
+	Active bool        `protobuf:"varint,7,opt,name=active,proto3" json:"active,omitempty"`
+	// The condition that is associated with the risk.
+	// The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+	//
+	// All supported variables:
+	// affected_rows: affected row count in the DDL/DML, support "==", "!=", "<", "<=", ">", ">=" operations.
+	// table_rows: table row count number, support "==", "!=", "<", "<=", ">", ">=" operations.
+	// environment_id: the environment resource id, support "==", "!=", "in [xx]", "!(in [xx])" operations.
+	// project_id: the project resource id, support "==", "!=", "in [xx]", "!(in [xx])", "contains()", "matches()", "startsWith()", "endsWith()" operations.
+	// db_engine: the database engine type, support "==", "!=", "in [xx]", "!(in [xx])" operations. Check the Engine enum for the values.
+	// sql_type: the SQL type, support "==", "!=", "in [xx]", "!(in [xx])" operations.
+	//
+	//	when the risk source is DDL, check https://github.com/bytebase/bytebase/blob/main/frontend/src/plugins/cel/types/values.ts#L70 for supported values.
+	//	when the risk source is DML, check https://github.com/bytebase/bytebase/blob/main/frontend/src/plugins/cel/types/values.ts#L71 for supported values.
+	//
+	// database_name: the database name, support "==", "!=", "in [xx]", "!(in [xx])", "contains()", "matches()", "startsWith()", "endsWith()" operations.
+	// schema_name: the schema name, support "==", "!=", "in [xx]", "!(in [xx])", "contains()", "matches()", "startsWith()", "endsWith()" operations.
+	// table_name: the table name, support "==", "!=", "in [xx]", "!(in [xx])", "contains()", "matches()", "startsWith()", "endsWith()" operations.
+	// sql_statement: the SQL statement, support "contains()", "matches()", "startsWith()", "endsWith()" operations.
+	// export_rows: export data count, support "==", "!=", "<", "<=", ">", ">=" operations.
+	// expiration_days: the role expiration days for the request, support "==", "!=", "<", "<=", ">", ">=" operations.
+	// role: the request role full name, support "==", "!=", "in [xx]", "!(in [xx])", "contains()", "matches()", "startsWith()", "endsWith()" operations.
+	//
+	// When the risk source is DDL/DML, support following variables:
+	// affected_rows
+	// table_rows
+	// environment_id
+	// project_id
+	// db_engine
+	// sql_type
+	// database_name
+	// schema_name
+	// table_name
+	// sql_statement
+	//
+	// When the risk source is CREATE_DATABASE, support following variables:
+	// environment_id
+	// project_id
+	// db_engine
+	// database_name
+	//
+	// When the risk source is DATA_EXPORT, support following variables:
+	// environment_id
+	// project_id
+	// db_engine
+	// database_name
+	// schema_name
+	// table_name
+	// export_rows
+	//
+	// When the risk source is REQUEST_QUERY, support following variables:
+	// environment_id
+	// project_id
+	// db_engine
+	// database_name
+	// schema_name
+	// table_name
+	// expiration_days
+	//
+	// When the risk source is REQUEST_EXPORT, support following variables:
+	// environment_id
+	// project_id
+	// db_engine
+	// database_name
+	// schema_name
+	// table_name
+	// expiration_days
+	// export_rows
+	//
+	// When the risk source is REQUEST_ROLE, support following variables:
+	// project_id
+	// expiration_days
+	// role
+	Condition     *expr.Expr `protobuf:"bytes,8,opt,name=condition,proto3" json:"condition,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Risk) Reset() {
 	*x = Risk{}
-	mi := &file_v1_risk_service_proto_msgTypes[5]
+	mi := &file_v1_risk_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -378,7 +493,7 @@ func (x *Risk) String() string {
 func (*Risk) ProtoMessage() {}
 
 func (x *Risk) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_risk_service_proto_msgTypes[5]
+	mi := &file_v1_risk_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -391,7 +506,7 @@ func (x *Risk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Risk.ProtoReflect.Descriptor instead.
 func (*Risk) Descriptor() ([]byte, []int) {
-	return file_v1_risk_service_proto_rawDescGZIP(), []int{5}
+	return file_v1_risk_service_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Risk) GetName() string {
@@ -449,38 +564,41 @@ const file_v1_risk_service_proto_rawDesc = "" +
 	"\x05risks\x18\x01 \x03(\v2\x11.bytebase.v1.RiskR\x05risks\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"@\n" +
 	"\x11CreateRiskRequest\x12+\n" +
-	"\x04risk\x18\x01 \x01(\v2\x11.bytebase.v1.RiskB\x04\xe2A\x01\x02R\x04risk\"\x83\x01\n" +
+	"\x04risk\x18\x01 \x01(\v2\x11.bytebase.v1.RiskB\x04\xe2A\x01\x02R\x04risk\"@\n" +
+	"\x0eGetRiskRequest\x12.\n" +
+	"\x04name\x18\x01 \x01(\tB\x1a\xe2A\x01\x02\xfaA\x13\n" +
+	"\x11bytebase.com/RiskR\x04name\"\x83\x01\n" +
 	"\x11UpdateRiskRequest\x12+\n" +
 	"\x04risk\x18\x01 \x01(\v2\x11.bytebase.v1.RiskB\x04\xe2A\x01\x02R\x04risk\x12A\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x04\xe2A\x01\x02R\n" +
 	"updateMask\"C\n" +
 	"\x11DeleteRiskRequest\x12.\n" +
 	"\x04name\x18\x01 \x01(\tB\x1a\xe2A\x01\x02\xfaA\x13\n" +
-	"\x11bytebase.com/RiskR\x04name\"\xee\x02\n" +
+	"\x11bytebase.com/RiskR\x04name\"\xd9\x02\n" +
 	"\x04Risk\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x120\n" +
 	"\x06source\x18\x03 \x01(\x0e2\x18.bytebase.v1.Risk.SourceR\x06source\x12\x14\n" +
 	"\x05title\x18\x04 \x01(\tR\x05title\x12\x14\n" +
 	"\x05level\x18\x05 \x01(\x05R\x05level\x12\x16\n" +
 	"\x06active\x18\a \x01(\bR\x06active\x12/\n" +
-	"\tcondition\x18\b \x01(\v2\x11.google.type.ExprR\tcondition\"\x7f\n" +
+	"\tcondition\x18\b \x01(\v2\x11.google.type.ExprR\tcondition\"j\n" +
 	"\x06Source\x12\x16\n" +
 	"\x12SOURCE_UNSPECIFIED\x10\x00\x12\a\n" +
 	"\x03DDL\x10\x01\x12\a\n" +
 	"\x03DML\x10\x02\x12\x13\n" +
-	"\x0fCREATE_DATABASE\x10\x03\x12\x11\n" +
-	"\rREQUEST_QUERY\x10\x04\x12\x12\n" +
-	"\x0eREQUEST_EXPORT\x10\x05\x12\x0f\n" +
-	"\vDATA_EXPORT\x10\x06:$\xeaA!\n" +
-	"\x11bytebase.com/Risk\x12\frisks/{risk}J\x04\b\x02\x10\x032\x94\x04\n" +
+	"\x0fCREATE_DATABASE\x10\x03\x12\x0f\n" +
+	"\vDATA_EXPORT\x10\x06\x12\x10\n" +
+	"\fREQUEST_ROLE\x10\a:$\xeaA!\n" +
+	"\x11bytebase.com/Risk\x12\frisks/{risk}J\x04\b\x02\x10\x032\x87\x05\n" +
 	"\vRiskService\x12u\n" +
 	"\tListRisks\x12\x1d.bytebase.v1.ListRisksRequest\x1a\x1e.bytebase.v1.ListRisksResponse\")\xdaA\x00\x8a\xea0\rbb.risks.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\v\x12\t/v1/risks\x12z\n" +
 	"\n" +
-	"CreateRisk\x12\x1e.bytebase.v1.CreateRiskRequest\x1a\x11.bytebase.v1.Risk\"9\xdaA\x04risk\x8a\xea0\x0fbb.risks.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x11:\x04risk\"\t/v1/risks\x12\x94\x01\n" +
+	"CreateRisk\x12\x1e.bytebase.v1.CreateRiskRequest\x1a\x11.bytebase.v1.Risk\"9\xdaA\x04risk\x8a\xea0\x0fbb.risks.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x11:\x04risk\"\t/v1/risks\x12q\n" +
+	"\aGetRisk\x12\x1b.bytebase.v1.GetRiskRequest\x1a\x11.bytebase.v1.Risk\"6\xdaA\x04name\x8a\xea0\rbb.risks.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/{name=risks/*}\x12\x94\x01\n" +
 	"\n" +
 	"UpdateRisk\x12\x1e.bytebase.v1.UpdateRiskRequest\x1a\x11.bytebase.v1.Risk\"S\xdaA\x10risk,update_mask\x8a\xea0\x0fbb.risks.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x1f:\x04risk2\x17/v1/{risk.name=risks/*}\x12{\n" +
 	"\n" +
-	"DeleteRisk\x12\x1e.bytebase.v1.DeleteRiskRequest\x1a\x16.google.protobuf.Empty\"5\x8a\xea0\x0fbb.risks.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x14*\x12/v1/{name=risks/*}B\x11Z\x0fgenerated-go/v1b\x06proto3"
+	"DeleteRisk\x12\x1e.bytebase.v1.DeleteRiskRequest\x1a\x16.google.protobuf.Empty\"5\x8a\xea0\x0fbb.risks.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x14*\x12/v1/{name=risks/*}B4Z2github.com/bytebase/bytebase/proto/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_risk_service_proto_rawDescOnce sync.Once
@@ -495,36 +613,39 @@ func file_v1_risk_service_proto_rawDescGZIP() []byte {
 }
 
 var file_v1_risk_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_v1_risk_service_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_v1_risk_service_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_v1_risk_service_proto_goTypes = []any{
 	(Risk_Source)(0),              // 0: bytebase.v1.Risk.Source
 	(*ListRisksRequest)(nil),      // 1: bytebase.v1.ListRisksRequest
 	(*ListRisksResponse)(nil),     // 2: bytebase.v1.ListRisksResponse
 	(*CreateRiskRequest)(nil),     // 3: bytebase.v1.CreateRiskRequest
-	(*UpdateRiskRequest)(nil),     // 4: bytebase.v1.UpdateRiskRequest
-	(*DeleteRiskRequest)(nil),     // 5: bytebase.v1.DeleteRiskRequest
-	(*Risk)(nil),                  // 6: bytebase.v1.Risk
-	(*fieldmaskpb.FieldMask)(nil), // 7: google.protobuf.FieldMask
-	(*expr.Expr)(nil),             // 8: google.type.Expr
-	(*emptypb.Empty)(nil),         // 9: google.protobuf.Empty
+	(*GetRiskRequest)(nil),        // 4: bytebase.v1.GetRiskRequest
+	(*UpdateRiskRequest)(nil),     // 5: bytebase.v1.UpdateRiskRequest
+	(*DeleteRiskRequest)(nil),     // 6: bytebase.v1.DeleteRiskRequest
+	(*Risk)(nil),                  // 7: bytebase.v1.Risk
+	(*fieldmaskpb.FieldMask)(nil), // 8: google.protobuf.FieldMask
+	(*expr.Expr)(nil),             // 9: google.type.Expr
+	(*emptypb.Empty)(nil),         // 10: google.protobuf.Empty
 }
 var file_v1_risk_service_proto_depIdxs = []int32{
-	6,  // 0: bytebase.v1.ListRisksResponse.risks:type_name -> bytebase.v1.Risk
-	6,  // 1: bytebase.v1.CreateRiskRequest.risk:type_name -> bytebase.v1.Risk
-	6,  // 2: bytebase.v1.UpdateRiskRequest.risk:type_name -> bytebase.v1.Risk
-	7,  // 3: bytebase.v1.UpdateRiskRequest.update_mask:type_name -> google.protobuf.FieldMask
+	7,  // 0: bytebase.v1.ListRisksResponse.risks:type_name -> bytebase.v1.Risk
+	7,  // 1: bytebase.v1.CreateRiskRequest.risk:type_name -> bytebase.v1.Risk
+	7,  // 2: bytebase.v1.UpdateRiskRequest.risk:type_name -> bytebase.v1.Risk
+	8,  // 3: bytebase.v1.UpdateRiskRequest.update_mask:type_name -> google.protobuf.FieldMask
 	0,  // 4: bytebase.v1.Risk.source:type_name -> bytebase.v1.Risk.Source
-	8,  // 5: bytebase.v1.Risk.condition:type_name -> google.type.Expr
+	9,  // 5: bytebase.v1.Risk.condition:type_name -> google.type.Expr
 	1,  // 6: bytebase.v1.RiskService.ListRisks:input_type -> bytebase.v1.ListRisksRequest
 	3,  // 7: bytebase.v1.RiskService.CreateRisk:input_type -> bytebase.v1.CreateRiskRequest
-	4,  // 8: bytebase.v1.RiskService.UpdateRisk:input_type -> bytebase.v1.UpdateRiskRequest
-	5,  // 9: bytebase.v1.RiskService.DeleteRisk:input_type -> bytebase.v1.DeleteRiskRequest
-	2,  // 10: bytebase.v1.RiskService.ListRisks:output_type -> bytebase.v1.ListRisksResponse
-	6,  // 11: bytebase.v1.RiskService.CreateRisk:output_type -> bytebase.v1.Risk
-	6,  // 12: bytebase.v1.RiskService.UpdateRisk:output_type -> bytebase.v1.Risk
-	9,  // 13: bytebase.v1.RiskService.DeleteRisk:output_type -> google.protobuf.Empty
-	10, // [10:14] is the sub-list for method output_type
-	6,  // [6:10] is the sub-list for method input_type
+	4,  // 8: bytebase.v1.RiskService.GetRisk:input_type -> bytebase.v1.GetRiskRequest
+	5,  // 9: bytebase.v1.RiskService.UpdateRisk:input_type -> bytebase.v1.UpdateRiskRequest
+	6,  // 10: bytebase.v1.RiskService.DeleteRisk:input_type -> bytebase.v1.DeleteRiskRequest
+	2,  // 11: bytebase.v1.RiskService.ListRisks:output_type -> bytebase.v1.ListRisksResponse
+	7,  // 12: bytebase.v1.RiskService.CreateRisk:output_type -> bytebase.v1.Risk
+	7,  // 13: bytebase.v1.RiskService.GetRisk:output_type -> bytebase.v1.Risk
+	7,  // 14: bytebase.v1.RiskService.UpdateRisk:output_type -> bytebase.v1.Risk
+	10, // 15: bytebase.v1.RiskService.DeleteRisk:output_type -> google.protobuf.Empty
+	11, // [11:16] is the sub-list for method output_type
+	6,  // [6:11] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name
 	6,  // [6:6] is the sub-list for extension extendee
 	0,  // [0:6] is the sub-list for field type_name
@@ -542,7 +663,7 @@ func file_v1_risk_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_risk_service_proto_rawDesc), len(file_v1_risk_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

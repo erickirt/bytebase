@@ -89,7 +89,7 @@
                 </NTag>
               </div>
               <router-link
-                v-if="!hasRBACFeature"
+                v-if="!hasFeature(PlanFeature.FEATURE_IAM)"
                 :to="'/setting/subscription'"
                 class="normal-link"
               >
@@ -154,7 +154,7 @@
             class="text-lg font-medium flex flex-row justify-start items-center"
           >
             {{ $t("two-factor.self") }}
-            <FeatureBadge :feature="'bb.feature.2fa'" custom-class="ml-2" />
+            <FeatureBadge :feature="PlanFeature.FEATURE_TWO_FA" class="ml-2" />
           </span>
           <div class="space-x-2">
             <NButton v-if="user.email === currentUser.email" @click="enable2FA">
@@ -169,7 +169,7 @@
           {{ $t("two-factor.description") }}
           <LearnMoreLink
             class="ml-1"
-            url="https://www.bytebase.com/docs/administration/2fa?source=console"
+            url="https://docs.bytebase.com/administration/2fa?source=console"
           />
         </p>
         <template v-if="showRegenerateRecoveryCodes">
@@ -203,7 +203,7 @@
   </main>
 
   <FeatureModal
-    feature="bb.feature.2fa"
+    :feature="PlanFeature.FEATURE_TWO_FA"
     :open="state.showFeatureModal"
     @cancel="state.showFeatureModal = false"
   />
@@ -224,8 +224,8 @@
 import { computedAsync, useTitle } from "@vueuse/core";
 import { cloneDeep, head, isEqual } from "lodash-es";
 import type { DropdownOption } from "naive-ui";
-import { NButton, NInput, NDropdown, NTag } from "naive-ui";
-import { nextTick, computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { NButton, NDropdown, NInput, NTag } from "naive-ui";
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import EmailInput from "@/components/EmailInput.vue";
@@ -242,20 +242,22 @@ import { WORKSPACE_ROUTE_USER_PROFILE } from "@/router/dashboard/workspaceRoutes
 import { SETTING_ROUTE_PROFILE_TWO_FACTOR } from "@/router/dashboard/workspaceSetting";
 import {
   featureToRef,
+  hasFeature,
   pushNotification,
   useActuatorV1Store,
   useCurrentUserV1,
+  usePermissionStore,
   useSettingV1Store,
   useUserStore,
   useWorkspaceV1Store,
-  usePermissionStore,
 } from "@/store";
 import {
-  unknownUser,
-  SYSTEM_BOT_USER_NAME,
   ALL_USERS_USER_EMAIL,
+  SYSTEM_BOT_USER_NAME,
+  unknownUser,
 } from "@/types";
 import { State } from "@/types/proto/v1/common";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import {
   UpdateUserRequest,
   UserType,
@@ -324,8 +326,7 @@ onUnmounted(() => {
   document.removeEventListener("keydown", keyboardHandler);
 });
 
-const hasRBACFeature = featureToRef("bb.feature.rbac");
-const has2FAFeature = featureToRef("bb.feature.2fa");
+const has2FAFeature = featureToRef(PlanFeature.FEATURE_TWO_FA);
 
 const isMFAEnabled = computed(() => {
   return user.value.mfaEnabled;

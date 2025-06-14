@@ -28,6 +28,7 @@ import UserAvatar from "@/components/User/UserAvatar.vue";
 import ServiceAccountTag from "@/components/misc/ServiceAccountTag.vue";
 import { extractUserId, useUserStore, type UserFilter } from "@/store";
 import {
+  DEBOUNCE_SEARCH_DELAY,
   SYSTEM_BOT_USER_NAME,
   UNKNOWN_USER_NAME,
   allUsersUser,
@@ -141,7 +142,7 @@ const handleSearch = useDebounceFn(async (search: string) => {
   } finally {
     state.loading = false;
   }
-}, 200);
+}, DEBOUNCE_SEARCH_DELAY);
 
 onMounted(async () => {
   await handleSearch("");
@@ -204,7 +205,12 @@ const filterByEmail = (pattern: string, user: User) => {
 // might not exist in the new list. In such case, we need to invalidate the selection
 // and emit the event.
 const resetInvalidSelection = () => {
-  if (!props.autoReset) return;
+  if (!props.autoReset || props.multiple) {
+    return;
+  }
+  if (state.loading) {
+    return;
+  }
   if (
     props.user &&
     !state.rawUserList.find((user) => extractUserId(user.name) === props.user)
@@ -214,7 +220,7 @@ const resetInvalidSelection = () => {
 };
 
 watch(
-  [() => props.user, () => props.users, state.rawUserList],
+  [() => state.loading, () => props.user, state.rawUserList],
   resetInvalidSelection,
   {
     immediate: true,

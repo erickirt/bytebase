@@ -1,20 +1,20 @@
 import { computedAsync } from "@vueuse/core";
 import { computed, ref } from "vue";
+import { getLocalSheetByName } from "@/components/Plan";
 import { useSheetV1Store } from "@/store";
+import type { Plan_Spec } from "@/types/proto/v1/plan_service";
 import {
   extractSheetUID,
   getSheetStatement,
   setSheetStatement,
   sheetNameOfSpec,
 } from "@/utils";
-import { getLocalSheetByName, usePlanContext } from "../../logic";
 
-export const useSpecSheet = () => {
+export const useSpecSheet = (spec: Plan_Spec) => {
   const sheetStore = useSheetV1Store();
-  const { selectedSpec } = usePlanContext();
 
   const sheetName = computed(() => {
-    return sheetNameOfSpec(selectedSpec.value);
+    return sheetNameOfSpec(spec);
   });
   const isFetchingSheet = ref(false);
   const sheetReady = computed(() => {
@@ -27,7 +27,6 @@ export const useSpecSheet = () => {
       if (uid.startsWith("-")) {
         return getLocalSheetByName(name);
       }
-
       return sheetStore.getOrFetchSheetByName(name);
     },
     undefined,

@@ -101,6 +101,7 @@ import {
   pushNotification,
   useSQLEditorTabStore,
   useWorkSheetStore,
+  useSettingV1Store,
   useWorkSheetAndTabStore,
 } from "@/store";
 import type { AccessOption } from "@/types";
@@ -113,6 +114,11 @@ const router = useRouter();
 const tabStore = useSQLEditorTabStore();
 const worksheetV1Store = useWorkSheetStore();
 const sheetAndTabStore = useWorkSheetAndTabStore();
+const settingStore = useSettingV1Store();
+
+const workspaceExternalURL = computed(
+  () => settingStore.workspaceProfileSetting?.externalUrl
+);
 
 const accessOptions = computed<AccessOption[]>(() => {
   return [
@@ -147,23 +153,22 @@ const allowChangeAccess = computed(() => {
 const currentAccess = ref<AccessOption>(accessOptions.value[0]);
 const isShowAccessPopover = ref(false);
 
-const updateWorksheet = () => {
-  if (sheet.value) {
-    worksheetV1Store.patchWorksheet(
+const handleChangeAccess = async (option: AccessOption) => {
+  // only creator can change access
+  if (allowChangeAccess.value && sheet.value) {
+    currentAccess.value = option;
+    await worksheetV1Store.patchWorksheet(
       {
         name: sheet.value.name,
         visibility: currentAccess.value.value,
       },
       ["visibility"]
     );
-  }
-};
-
-const handleChangeAccess = (option: AccessOption) => {
-  // only creator can change access
-  if (allowChangeAccess.value) {
-    currentAccess.value = option;
-    updateWorksheet();
+    pushNotification({
+      module: "bytebase",
+      style: "SUCCESS",
+      title: t("common.updated"),
+    });
   }
   isShowAccessPopover.value = false;
 };
@@ -180,7 +185,10 @@ const sharedTabLink = computed(() => {
       sheet: extractWorksheetUID(sheet.value.name),
     },
   });
-  return new URL(route.href, window.location.origin).href;
+  return new URL(
+    route.href,
+    workspaceExternalURL.value || window.location.origin
+  ).href;
 });
 
 const { copy, copied } = useClipboard({

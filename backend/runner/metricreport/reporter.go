@@ -10,13 +10,14 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/bytebase/bytebase/backend/base"
+	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/component/config"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	"github.com/bytebase/bytebase/backend/plugin/metric"
 	"github.com/bytebase/bytebase/backend/plugin/metric/segment"
 	"github.com/bytebase/bytebase/backend/store"
+	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
 
 const (
@@ -47,7 +48,7 @@ const (
 
 // Reporter is the metric reporter.
 type Reporter struct {
-	licenseService enterprise.LicenseService
+	licenseService *enterprise.LicenseService
 	profile        *config.Profile
 	reporter       metric.Reporter
 	collectors     map[string]metric.Collector
@@ -55,7 +56,7 @@ type Reporter struct {
 }
 
 // NewReporter creates a new metric scheduler.
-func NewReporter(store *store.Store, licenseService enterprise.LicenseService, profile *config.Profile) *Reporter {
+func NewReporter(store *store.Store, licenseService *enterprise.LicenseService, profile *config.Profile) *Reporter {
 	var r metric.Reporter
 	if profile.MetricConnectionKey != "" {
 		r = segment.NewReporter(profile.MetricConnectionKey)
@@ -154,8 +155,8 @@ func (m *Reporter) identify(ctx context.Context) (string, error) {
 	}
 	subscription := m.licenseService.LoadSubscription(ctx)
 	plan := subscription.Plan.String()
-	orgID := subscription.OrgID
-	orgName := subscription.OrgName
+	orgID := ""
+	orgName := ""
 
 	trial := "N"
 	if subscription.Trialing {
@@ -164,14 +165,13 @@ func (m *Reporter) identify(ctx context.Context) (string, error) {
 
 	subscriptionStartDate := ""
 	subscriptionEndDate := ""
-	if subscription.Plan != base.FREE {
-		subscriptionStartDate = time.Unix(subscription.StartedTS, 0).Format(time.RFC3339)
-		subscriptionEndDate = time.Unix(subscription.ExpiresTS, 0).Format(time.RFC3339)
+	if subscription.Plan != v1pb.PlanType_FREE && subscription.ExpiresTime != nil {
+		subscriptionEndDate = subscription.ExpiresTime.AsTime().Format(time.RFC3339)
 	}
 
-	user, err := m.store.GetUserByID(ctx, base.PrincipalIDForFirstUser)
+	user, err := m.store.GetUserByID(ctx, common.PrincipalIDForFirstUser)
 	if err != nil {
-		slog.Debug("unable to get the first principal user", slog.Int("id", base.PrincipalIDForFirstUser), log.BBError(err))
+		slog.Debug("unable to get the first principal user", slog.Int("id", common.PrincipalIDForFirstUser), log.BBError(err))
 	}
 	email := ""
 	name := ""
@@ -196,7 +196,7 @@ func (m *Reporter) identify(ctx context.Context) (string, error) {
 			identifyTraitForOrgID:                 orgID,
 			identifyTraitForOrgName:               orgName,
 			identifyTraitForMode:                  mode,
-			identifyTraitForLastActiveTime:        time.Unix(m.profile.LastActiveTS, 0).String(),
+			identifyTraitForLastActiveTime:        time.Unix(m.profile.LastActiveTS.Load(), 0).String(),
 			identifyTraitForSubscriptionStartDate: subscriptionStartDate,
 			identifyTraitForSubscriptionEndDate:   subscriptionEndDate,
 		},

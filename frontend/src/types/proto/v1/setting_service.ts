@@ -9,13 +9,11 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import Long from "long";
 import { Duration } from "../google/protobuf/duration";
 import { FieldMask } from "../google/protobuf/field_mask";
-import { Timestamp } from "../google/protobuf/timestamp";
 import { Expr } from "../google/type/expr";
 import { Engine, engineFromJSON, engineToJSON, engineToNumber } from "./common";
 import { ColumnCatalog, TableCatalog } from "./database_catalog_service";
 import { ColumnMetadata, TableMetadata } from "./database_service";
 import { ApprovalTemplate } from "./issue_service";
-import { PlanType, planTypeFromJSON, planTypeToJSON, planTypeToNumber } from "./subscription_service";
 
 export const protobufPackage = "bytebase.v1";
 
@@ -146,16 +144,195 @@ export interface Setting {
   value: Value | undefined;
 }
 
+export enum Setting_SettingName {
+  SETTING_NAME_UNSPECIFIED = "SETTING_NAME_UNSPECIFIED",
+  AUTH_SECRET = "AUTH_SECRET",
+  BRANDING_LOGO = "BRANDING_LOGO",
+  WORKSPACE_ID = "WORKSPACE_ID",
+  WORKSPACE_PROFILE = "WORKSPACE_PROFILE",
+  WORKSPACE_APPROVAL = "WORKSPACE_APPROVAL",
+  WORKSPACE_EXTERNAL_APPROVAL = "WORKSPACE_EXTERNAL_APPROVAL",
+  ENTERPRISE_LICENSE = "ENTERPRISE_LICENSE",
+  APP_IM = "APP_IM",
+  WATERMARK = "WATERMARK",
+  AI = "AI",
+  PLUGIN_AGENT = "PLUGIN_AGENT",
+  SCHEMA_TEMPLATE = "SCHEMA_TEMPLATE",
+  DATA_CLASSIFICATION = "DATA_CLASSIFICATION",
+  SEMANTIC_TYPES = "SEMANTIC_TYPES",
+  SQL_RESULT_SIZE_LIMIT = "SQL_RESULT_SIZE_LIMIT",
+  SCIM = "SCIM",
+  PASSWORD_RESTRICTION = "PASSWORD_RESTRICTION",
+  ENVIRONMENT = "ENVIRONMENT",
+  UNRECOGNIZED = "UNRECOGNIZED",
+}
+
+export function setting_SettingNameFromJSON(object: any): Setting_SettingName {
+  switch (object) {
+    case 0:
+    case "SETTING_NAME_UNSPECIFIED":
+      return Setting_SettingName.SETTING_NAME_UNSPECIFIED;
+    case 1:
+    case "AUTH_SECRET":
+      return Setting_SettingName.AUTH_SECRET;
+    case 2:
+    case "BRANDING_LOGO":
+      return Setting_SettingName.BRANDING_LOGO;
+    case 3:
+    case "WORKSPACE_ID":
+      return Setting_SettingName.WORKSPACE_ID;
+    case 4:
+    case "WORKSPACE_PROFILE":
+      return Setting_SettingName.WORKSPACE_PROFILE;
+    case 5:
+    case "WORKSPACE_APPROVAL":
+      return Setting_SettingName.WORKSPACE_APPROVAL;
+    case 6:
+    case "WORKSPACE_EXTERNAL_APPROVAL":
+      return Setting_SettingName.WORKSPACE_EXTERNAL_APPROVAL;
+    case 7:
+    case "ENTERPRISE_LICENSE":
+      return Setting_SettingName.ENTERPRISE_LICENSE;
+    case 8:
+    case "APP_IM":
+      return Setting_SettingName.APP_IM;
+    case 9:
+    case "WATERMARK":
+      return Setting_SettingName.WATERMARK;
+    case 10:
+    case "AI":
+      return Setting_SettingName.AI;
+    case 11:
+    case "PLUGIN_AGENT":
+      return Setting_SettingName.PLUGIN_AGENT;
+    case 13:
+    case "SCHEMA_TEMPLATE":
+      return Setting_SettingName.SCHEMA_TEMPLATE;
+    case 14:
+    case "DATA_CLASSIFICATION":
+      return Setting_SettingName.DATA_CLASSIFICATION;
+    case 15:
+    case "SEMANTIC_TYPES":
+      return Setting_SettingName.SEMANTIC_TYPES;
+    case 16:
+    case "SQL_RESULT_SIZE_LIMIT":
+      return Setting_SettingName.SQL_RESULT_SIZE_LIMIT;
+    case 17:
+    case "SCIM":
+      return Setting_SettingName.SCIM;
+    case 18:
+    case "PASSWORD_RESTRICTION":
+      return Setting_SettingName.PASSWORD_RESTRICTION;
+    case 19:
+    case "ENVIRONMENT":
+      return Setting_SettingName.ENVIRONMENT;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return Setting_SettingName.UNRECOGNIZED;
+  }
+}
+
+export function setting_SettingNameToJSON(object: Setting_SettingName): string {
+  switch (object) {
+    case Setting_SettingName.SETTING_NAME_UNSPECIFIED:
+      return "SETTING_NAME_UNSPECIFIED";
+    case Setting_SettingName.AUTH_SECRET:
+      return "AUTH_SECRET";
+    case Setting_SettingName.BRANDING_LOGO:
+      return "BRANDING_LOGO";
+    case Setting_SettingName.WORKSPACE_ID:
+      return "WORKSPACE_ID";
+    case Setting_SettingName.WORKSPACE_PROFILE:
+      return "WORKSPACE_PROFILE";
+    case Setting_SettingName.WORKSPACE_APPROVAL:
+      return "WORKSPACE_APPROVAL";
+    case Setting_SettingName.WORKSPACE_EXTERNAL_APPROVAL:
+      return "WORKSPACE_EXTERNAL_APPROVAL";
+    case Setting_SettingName.ENTERPRISE_LICENSE:
+      return "ENTERPRISE_LICENSE";
+    case Setting_SettingName.APP_IM:
+      return "APP_IM";
+    case Setting_SettingName.WATERMARK:
+      return "WATERMARK";
+    case Setting_SettingName.AI:
+      return "AI";
+    case Setting_SettingName.PLUGIN_AGENT:
+      return "PLUGIN_AGENT";
+    case Setting_SettingName.SCHEMA_TEMPLATE:
+      return "SCHEMA_TEMPLATE";
+    case Setting_SettingName.DATA_CLASSIFICATION:
+      return "DATA_CLASSIFICATION";
+    case Setting_SettingName.SEMANTIC_TYPES:
+      return "SEMANTIC_TYPES";
+    case Setting_SettingName.SQL_RESULT_SIZE_LIMIT:
+      return "SQL_RESULT_SIZE_LIMIT";
+    case Setting_SettingName.SCIM:
+      return "SCIM";
+    case Setting_SettingName.PASSWORD_RESTRICTION:
+      return "PASSWORD_RESTRICTION";
+    case Setting_SettingName.ENVIRONMENT:
+      return "ENVIRONMENT";
+    case Setting_SettingName.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export function setting_SettingNameToNumber(object: Setting_SettingName): number {
+  switch (object) {
+    case Setting_SettingName.SETTING_NAME_UNSPECIFIED:
+      return 0;
+    case Setting_SettingName.AUTH_SECRET:
+      return 1;
+    case Setting_SettingName.BRANDING_LOGO:
+      return 2;
+    case Setting_SettingName.WORKSPACE_ID:
+      return 3;
+    case Setting_SettingName.WORKSPACE_PROFILE:
+      return 4;
+    case Setting_SettingName.WORKSPACE_APPROVAL:
+      return 5;
+    case Setting_SettingName.WORKSPACE_EXTERNAL_APPROVAL:
+      return 6;
+    case Setting_SettingName.ENTERPRISE_LICENSE:
+      return 7;
+    case Setting_SettingName.APP_IM:
+      return 8;
+    case Setting_SettingName.WATERMARK:
+      return 9;
+    case Setting_SettingName.AI:
+      return 10;
+    case Setting_SettingName.PLUGIN_AGENT:
+      return 11;
+    case Setting_SettingName.SCHEMA_TEMPLATE:
+      return 13;
+    case Setting_SettingName.DATA_CLASSIFICATION:
+      return 14;
+    case Setting_SettingName.SEMANTIC_TYPES:
+      return 15;
+    case Setting_SettingName.SQL_RESULT_SIZE_LIMIT:
+      return 16;
+    case Setting_SettingName.SCIM:
+      return 17;
+    case Setting_SettingName.PASSWORD_RESTRICTION:
+      return 18;
+    case Setting_SettingName.ENVIRONMENT:
+      return 19;
+    case Setting_SettingName.UNRECOGNIZED:
+    default:
+      return -1;
+  }
+}
+
 /** The data in setting value. */
 export interface Value {
   /** Defines this value as being a string value. */
   stringValue?: string | undefined;
-  smtpMailDeliverySettingValue?: SMTPMailDeliverySettingValue | undefined;
   appImSettingValue?: AppIMSetting | undefined;
   agentPluginSettingValue?: AgentPluginSetting | undefined;
   workspaceProfileSettingValue?: WorkspaceProfileSetting | undefined;
   workspaceApprovalSettingValue?: WorkspaceApprovalSetting | undefined;
-  workspaceTrialSettingValue?: WorkspaceTrialSetting | undefined;
   schemaTemplateSettingValue?: SchemaTemplateSetting | undefined;
   dataClassificationSettingValue?: DataClassificationSetting | undefined;
   semanticTypeSettingValue?: SemanticTypeSetting | undefined;
@@ -164,172 +341,6 @@ export interface Value {
   passwordRestrictionSetting?: PasswordRestrictionSetting | undefined;
   aiSetting?: AISetting | undefined;
   environmentSetting?: EnvironmentSetting | undefined;
-}
-
-export interface SMTPMailDeliverySettingValue {
-  /** The SMTP server address. */
-  server: string;
-  /** The SMTP server port. */
-  port: number;
-  /** The SMTP server encryption. */
-  encryption: SMTPMailDeliverySettingValue_Encryption;
-  /**
-   * The CA, KEY, and CERT for the SMTP server.
-   * Not used.
-   */
-  ca?: string | undefined;
-  key?: string | undefined;
-  cert?: string | undefined;
-  authentication: SMTPMailDeliverySettingValue_Authentication;
-  username: string;
-  /** If not specified, server will use the existed password. */
-  password?:
-    | string
-    | undefined;
-  /** The sender email address. */
-  from: string;
-  /** The recipient email address, used with validate_only to send test email. */
-  to: string;
-}
-
-/** We support three types of SMTP encryption: NONE, STARTTLS, and SSL/TLS. */
-export enum SMTPMailDeliverySettingValue_Encryption {
-  ENCRYPTION_UNSPECIFIED = "ENCRYPTION_UNSPECIFIED",
-  ENCRYPTION_NONE = "ENCRYPTION_NONE",
-  ENCRYPTION_STARTTLS = "ENCRYPTION_STARTTLS",
-  ENCRYPTION_SSL_TLS = "ENCRYPTION_SSL_TLS",
-  UNRECOGNIZED = "UNRECOGNIZED",
-}
-
-export function sMTPMailDeliverySettingValue_EncryptionFromJSON(object: any): SMTPMailDeliverySettingValue_Encryption {
-  switch (object) {
-    case 0:
-    case "ENCRYPTION_UNSPECIFIED":
-      return SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_UNSPECIFIED;
-    case 1:
-    case "ENCRYPTION_NONE":
-      return SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_NONE;
-    case 2:
-    case "ENCRYPTION_STARTTLS":
-      return SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_STARTTLS;
-    case 3:
-    case "ENCRYPTION_SSL_TLS":
-      return SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_SSL_TLS;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return SMTPMailDeliverySettingValue_Encryption.UNRECOGNIZED;
-  }
-}
-
-export function sMTPMailDeliverySettingValue_EncryptionToJSON(object: SMTPMailDeliverySettingValue_Encryption): string {
-  switch (object) {
-    case SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_UNSPECIFIED:
-      return "ENCRYPTION_UNSPECIFIED";
-    case SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_NONE:
-      return "ENCRYPTION_NONE";
-    case SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_STARTTLS:
-      return "ENCRYPTION_STARTTLS";
-    case SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_SSL_TLS:
-      return "ENCRYPTION_SSL_TLS";
-    case SMTPMailDeliverySettingValue_Encryption.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export function sMTPMailDeliverySettingValue_EncryptionToNumber(
-  object: SMTPMailDeliverySettingValue_Encryption,
-): number {
-  switch (object) {
-    case SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_UNSPECIFIED:
-      return 0;
-    case SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_NONE:
-      return 1;
-    case SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_STARTTLS:
-      return 2;
-    case SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_SSL_TLS:
-      return 3;
-    case SMTPMailDeliverySettingValue_Encryption.UNRECOGNIZED:
-    default:
-      return -1;
-  }
-}
-
-/** We support four types of SMTP authentication: NONE, PLAIN, LOGIN, and CRAM-MD5. */
-export enum SMTPMailDeliverySettingValue_Authentication {
-  AUTHENTICATION_UNSPECIFIED = "AUTHENTICATION_UNSPECIFIED",
-  AUTHENTICATION_NONE = "AUTHENTICATION_NONE",
-  AUTHENTICATION_PLAIN = "AUTHENTICATION_PLAIN",
-  AUTHENTICATION_LOGIN = "AUTHENTICATION_LOGIN",
-  AUTHENTICATION_CRAM_MD5 = "AUTHENTICATION_CRAM_MD5",
-  UNRECOGNIZED = "UNRECOGNIZED",
-}
-
-export function sMTPMailDeliverySettingValue_AuthenticationFromJSON(
-  object: any,
-): SMTPMailDeliverySettingValue_Authentication {
-  switch (object) {
-    case 0:
-    case "AUTHENTICATION_UNSPECIFIED":
-      return SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_UNSPECIFIED;
-    case 1:
-    case "AUTHENTICATION_NONE":
-      return SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_NONE;
-    case 2:
-    case "AUTHENTICATION_PLAIN":
-      return SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_PLAIN;
-    case 3:
-    case "AUTHENTICATION_LOGIN":
-      return SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_LOGIN;
-    case 4:
-    case "AUTHENTICATION_CRAM_MD5":
-      return SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_CRAM_MD5;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return SMTPMailDeliverySettingValue_Authentication.UNRECOGNIZED;
-  }
-}
-
-export function sMTPMailDeliverySettingValue_AuthenticationToJSON(
-  object: SMTPMailDeliverySettingValue_Authentication,
-): string {
-  switch (object) {
-    case SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_UNSPECIFIED:
-      return "AUTHENTICATION_UNSPECIFIED";
-    case SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_NONE:
-      return "AUTHENTICATION_NONE";
-    case SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_PLAIN:
-      return "AUTHENTICATION_PLAIN";
-    case SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_LOGIN:
-      return "AUTHENTICATION_LOGIN";
-    case SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_CRAM_MD5:
-      return "AUTHENTICATION_CRAM_MD5";
-    case SMTPMailDeliverySettingValue_Authentication.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export function sMTPMailDeliverySettingValue_AuthenticationToNumber(
-  object: SMTPMailDeliverySettingValue_Authentication,
-): number {
-  switch (object) {
-    case SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_UNSPECIFIED:
-      return 0;
-    case SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_NONE:
-      return 1;
-    case SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_PLAIN:
-      return 2;
-    case SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_LOGIN:
-      return 3;
-    case SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_CRAM_MD5:
-      return 4;
-    case SMTPMailDeliverySettingValue_Authentication.UNRECOGNIZED:
-    default:
-      return -1;
-  }
 }
 
 export interface AppIMSetting {
@@ -485,7 +496,20 @@ export interface WorkspaceApprovalSetting {
 }
 
 export interface WorkspaceApprovalSetting_Rule {
-  template: ApprovalTemplate | undefined;
+  template:
+    | ApprovalTemplate
+    | undefined;
+  /**
+   * The condition that is associated with the rule.
+   * The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+   *
+   * Support variables:
+   * source: the risk source, check the Source enum in the Risk message for the values, support "==" operator.
+   * level: the risk level, support 100 (low), 200 (moderate) and 300 (high), support "==" operator.
+   *
+   * For examples:
+   * (source == "DML" && level == 200) || (source == "DDL" && level == 300)
+   */
   condition: Expr | undefined;
 }
 
@@ -515,15 +539,6 @@ export interface SchemaTemplateSetting_TableTemplate {
   category: string;
   table: TableMetadata | undefined;
   catalog: TableCatalog | undefined;
-}
-
-export interface WorkspaceTrialSetting {
-  instanceCount: number;
-  expireTime: Timestamp | undefined;
-  issuedTime: Timestamp | undefined;
-  subject: string;
-  orgName: string;
-  plan: PlanType;
 }
 
 export interface DataClassificationSetting {
@@ -1276,12 +1291,10 @@ export const Setting: MessageFns<Setting> = {
 function createBaseValue(): Value {
   return {
     stringValue: undefined,
-    smtpMailDeliverySettingValue: undefined,
     appImSettingValue: undefined,
     agentPluginSettingValue: undefined,
     workspaceProfileSettingValue: undefined,
     workspaceApprovalSettingValue: undefined,
-    workspaceTrialSettingValue: undefined,
     schemaTemplateSettingValue: undefined,
     dataClassificationSettingValue: undefined,
     semanticTypeSettingValue: undefined,
@@ -1298,9 +1311,6 @@ export const Value: MessageFns<Value> = {
     if (message.stringValue !== undefined) {
       writer.uint32(10).string(message.stringValue);
     }
-    if (message.smtpMailDeliverySettingValue !== undefined) {
-      SMTPMailDeliverySettingValue.encode(message.smtpMailDeliverySettingValue, writer.uint32(18).fork()).join();
-    }
     if (message.appImSettingValue !== undefined) {
       AppIMSetting.encode(message.appImSettingValue, writer.uint32(26).fork()).join();
     }
@@ -1312,9 +1322,6 @@ export const Value: MessageFns<Value> = {
     }
     if (message.workspaceApprovalSettingValue !== undefined) {
       WorkspaceApprovalSetting.encode(message.workspaceApprovalSettingValue, writer.uint32(50).fork()).join();
-    }
-    if (message.workspaceTrialSettingValue !== undefined) {
-      WorkspaceTrialSetting.encode(message.workspaceTrialSettingValue, writer.uint32(58).fork()).join();
     }
     if (message.schemaTemplateSettingValue !== undefined) {
       SchemaTemplateSetting.encode(message.schemaTemplateSettingValue, writer.uint32(74).fork()).join();
@@ -1358,14 +1365,6 @@ export const Value: MessageFns<Value> = {
           message.stringValue = reader.string();
           continue;
         }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.smtpMailDeliverySettingValue = SMTPMailDeliverySettingValue.decode(reader, reader.uint32());
-          continue;
-        }
         case 3: {
           if (tag !== 26) {
             break;
@@ -1396,14 +1395,6 @@ export const Value: MessageFns<Value> = {
           }
 
           message.workspaceApprovalSettingValue = WorkspaceApprovalSetting.decode(reader, reader.uint32());
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.workspaceTrialSettingValue = WorkspaceTrialSetting.decode(reader, reader.uint32());
           continue;
         }
         case 9: {
@@ -1482,9 +1473,6 @@ export const Value: MessageFns<Value> = {
   fromJSON(object: any): Value {
     return {
       stringValue: isSet(object.stringValue) ? globalThis.String(object.stringValue) : undefined,
-      smtpMailDeliverySettingValue: isSet(object.smtpMailDeliverySettingValue)
-        ? SMTPMailDeliverySettingValue.fromJSON(object.smtpMailDeliverySettingValue)
-        : undefined,
       appImSettingValue: isSet(object.appImSettingValue) ? AppIMSetting.fromJSON(object.appImSettingValue) : undefined,
       agentPluginSettingValue: isSet(object.agentPluginSettingValue)
         ? AgentPluginSetting.fromJSON(object.agentPluginSettingValue)
@@ -1494,9 +1482,6 @@ export const Value: MessageFns<Value> = {
         : undefined,
       workspaceApprovalSettingValue: isSet(object.workspaceApprovalSettingValue)
         ? WorkspaceApprovalSetting.fromJSON(object.workspaceApprovalSettingValue)
-        : undefined,
-      workspaceTrialSettingValue: isSet(object.workspaceTrialSettingValue)
-        ? WorkspaceTrialSetting.fromJSON(object.workspaceTrialSettingValue)
         : undefined,
       schemaTemplateSettingValue: isSet(object.schemaTemplateSettingValue)
         ? SchemaTemplateSetting.fromJSON(object.schemaTemplateSettingValue)
@@ -1526,9 +1511,6 @@ export const Value: MessageFns<Value> = {
     if (message.stringValue !== undefined) {
       obj.stringValue = message.stringValue;
     }
-    if (message.smtpMailDeliverySettingValue !== undefined) {
-      obj.smtpMailDeliverySettingValue = SMTPMailDeliverySettingValue.toJSON(message.smtpMailDeliverySettingValue);
-    }
     if (message.appImSettingValue !== undefined) {
       obj.appImSettingValue = AppIMSetting.toJSON(message.appImSettingValue);
     }
@@ -1540,9 +1522,6 @@ export const Value: MessageFns<Value> = {
     }
     if (message.workspaceApprovalSettingValue !== undefined) {
       obj.workspaceApprovalSettingValue = WorkspaceApprovalSetting.toJSON(message.workspaceApprovalSettingValue);
-    }
-    if (message.workspaceTrialSettingValue !== undefined) {
-      obj.workspaceTrialSettingValue = WorkspaceTrialSetting.toJSON(message.workspaceTrialSettingValue);
     }
     if (message.schemaTemplateSettingValue !== undefined) {
       obj.schemaTemplateSettingValue = SchemaTemplateSetting.toJSON(message.schemaTemplateSettingValue);
@@ -1577,10 +1556,6 @@ export const Value: MessageFns<Value> = {
   fromPartial(object: DeepPartial<Value>): Value {
     const message = createBaseValue();
     message.stringValue = object.stringValue ?? undefined;
-    message.smtpMailDeliverySettingValue =
-      (object.smtpMailDeliverySettingValue !== undefined && object.smtpMailDeliverySettingValue !== null)
-        ? SMTPMailDeliverySettingValue.fromPartial(object.smtpMailDeliverySettingValue)
-        : undefined;
     message.appImSettingValue = (object.appImSettingValue !== undefined && object.appImSettingValue !== null)
       ? AppIMSetting.fromPartial(object.appImSettingValue)
       : undefined;
@@ -1595,10 +1570,6 @@ export const Value: MessageFns<Value> = {
     message.workspaceApprovalSettingValue =
       (object.workspaceApprovalSettingValue !== undefined && object.workspaceApprovalSettingValue !== null)
         ? WorkspaceApprovalSetting.fromPartial(object.workspaceApprovalSettingValue)
-        : undefined;
-    message.workspaceTrialSettingValue =
-      (object.workspaceTrialSettingValue !== undefined && object.workspaceTrialSettingValue !== null)
-        ? WorkspaceTrialSetting.fromPartial(object.workspaceTrialSettingValue)
         : undefined;
     message.schemaTemplateSettingValue =
       (object.schemaTemplateSettingValue !== undefined && object.schemaTemplateSettingValue !== null)
@@ -1629,243 +1600,6 @@ export const Value: MessageFns<Value> = {
     message.environmentSetting = (object.environmentSetting !== undefined && object.environmentSetting !== null)
       ? EnvironmentSetting.fromPartial(object.environmentSetting)
       : undefined;
-    return message;
-  },
-};
-
-function createBaseSMTPMailDeliverySettingValue(): SMTPMailDeliverySettingValue {
-  return {
-    server: "",
-    port: 0,
-    encryption: SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_UNSPECIFIED,
-    ca: undefined,
-    key: undefined,
-    cert: undefined,
-    authentication: SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_UNSPECIFIED,
-    username: "",
-    password: undefined,
-    from: "",
-    to: "",
-  };
-}
-
-export const SMTPMailDeliverySettingValue: MessageFns<SMTPMailDeliverySettingValue> = {
-  encode(message: SMTPMailDeliverySettingValue, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.server !== "") {
-      writer.uint32(10).string(message.server);
-    }
-    if (message.port !== 0) {
-      writer.uint32(16).int32(message.port);
-    }
-    if (message.encryption !== SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_UNSPECIFIED) {
-      writer.uint32(24).int32(sMTPMailDeliverySettingValue_EncryptionToNumber(message.encryption));
-    }
-    if (message.ca !== undefined) {
-      writer.uint32(34).string(message.ca);
-    }
-    if (message.key !== undefined) {
-      writer.uint32(42).string(message.key);
-    }
-    if (message.cert !== undefined) {
-      writer.uint32(50).string(message.cert);
-    }
-    if (message.authentication !== SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_UNSPECIFIED) {
-      writer.uint32(56).int32(sMTPMailDeliverySettingValue_AuthenticationToNumber(message.authentication));
-    }
-    if (message.username !== "") {
-      writer.uint32(66).string(message.username);
-    }
-    if (message.password !== undefined) {
-      writer.uint32(74).string(message.password);
-    }
-    if (message.from !== "") {
-      writer.uint32(82).string(message.from);
-    }
-    if (message.to !== "") {
-      writer.uint32(90).string(message.to);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SMTPMailDeliverySettingValue {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSMTPMailDeliverySettingValue();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.server = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.port = reader.int32();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.encryption = sMTPMailDeliverySettingValue_EncryptionFromJSON(reader.int32());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.ca = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.cert = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.authentication = sMTPMailDeliverySettingValue_AuthenticationFromJSON(reader.int32());
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.username = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.password = reader.string();
-          continue;
-        }
-        case 10: {
-          if (tag !== 82) {
-            break;
-          }
-
-          message.from = reader.string();
-          continue;
-        }
-        case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          message.to = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SMTPMailDeliverySettingValue {
-    return {
-      server: isSet(object.server) ? globalThis.String(object.server) : "",
-      port: isSet(object.port) ? globalThis.Number(object.port) : 0,
-      encryption: isSet(object.encryption)
-        ? sMTPMailDeliverySettingValue_EncryptionFromJSON(object.encryption)
-        : SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_UNSPECIFIED,
-      ca: isSet(object.ca) ? globalThis.String(object.ca) : undefined,
-      key: isSet(object.key) ? globalThis.String(object.key) : undefined,
-      cert: isSet(object.cert) ? globalThis.String(object.cert) : undefined,
-      authentication: isSet(object.authentication)
-        ? sMTPMailDeliverySettingValue_AuthenticationFromJSON(object.authentication)
-        : SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_UNSPECIFIED,
-      username: isSet(object.username) ? globalThis.String(object.username) : "",
-      password: isSet(object.password) ? globalThis.String(object.password) : undefined,
-      from: isSet(object.from) ? globalThis.String(object.from) : "",
-      to: isSet(object.to) ? globalThis.String(object.to) : "",
-    };
-  },
-
-  toJSON(message: SMTPMailDeliverySettingValue): unknown {
-    const obj: any = {};
-    if (message.server !== "") {
-      obj.server = message.server;
-    }
-    if (message.port !== 0) {
-      obj.port = Math.round(message.port);
-    }
-    if (message.encryption !== SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_UNSPECIFIED) {
-      obj.encryption = sMTPMailDeliverySettingValue_EncryptionToJSON(message.encryption);
-    }
-    if (message.ca !== undefined) {
-      obj.ca = message.ca;
-    }
-    if (message.key !== undefined) {
-      obj.key = message.key;
-    }
-    if (message.cert !== undefined) {
-      obj.cert = message.cert;
-    }
-    if (message.authentication !== SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_UNSPECIFIED) {
-      obj.authentication = sMTPMailDeliverySettingValue_AuthenticationToJSON(message.authentication);
-    }
-    if (message.username !== "") {
-      obj.username = message.username;
-    }
-    if (message.password !== undefined) {
-      obj.password = message.password;
-    }
-    if (message.from !== "") {
-      obj.from = message.from;
-    }
-    if (message.to !== "") {
-      obj.to = message.to;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<SMTPMailDeliverySettingValue>): SMTPMailDeliverySettingValue {
-    return SMTPMailDeliverySettingValue.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<SMTPMailDeliverySettingValue>): SMTPMailDeliverySettingValue {
-    const message = createBaseSMTPMailDeliverySettingValue();
-    message.server = object.server ?? "";
-    message.port = object.port ?? 0;
-    message.encryption = object.encryption ?? SMTPMailDeliverySettingValue_Encryption.ENCRYPTION_UNSPECIFIED;
-    message.ca = object.ca ?? undefined;
-    message.key = object.key ?? undefined;
-    message.cert = object.cert ?? undefined;
-    message.authentication = object.authentication ??
-      SMTPMailDeliverySettingValue_Authentication.AUTHENTICATION_UNSPECIFIED;
-    message.username = object.username ?? "";
-    message.password = object.password ?? undefined;
-    message.from = object.from ?? "";
-    message.to = object.to ?? "";
     return message;
   },
 };
@@ -3485,157 +3219,6 @@ export const SchemaTemplateSetting_TableTemplate: MessageFns<SchemaTemplateSetti
     message.catalog = (object.catalog !== undefined && object.catalog !== null)
       ? TableCatalog.fromPartial(object.catalog)
       : undefined;
-    return message;
-  },
-};
-
-function createBaseWorkspaceTrialSetting(): WorkspaceTrialSetting {
-  return {
-    instanceCount: 0,
-    expireTime: undefined,
-    issuedTime: undefined,
-    subject: "",
-    orgName: "",
-    plan: PlanType.PLAN_TYPE_UNSPECIFIED,
-  };
-}
-
-export const WorkspaceTrialSetting: MessageFns<WorkspaceTrialSetting> = {
-  encode(message: WorkspaceTrialSetting, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.instanceCount !== 0) {
-      writer.uint32(8).int32(message.instanceCount);
-    }
-    if (message.expireTime !== undefined) {
-      Timestamp.encode(message.expireTime, writer.uint32(18).fork()).join();
-    }
-    if (message.issuedTime !== undefined) {
-      Timestamp.encode(message.issuedTime, writer.uint32(26).fork()).join();
-    }
-    if (message.subject !== "") {
-      writer.uint32(34).string(message.subject);
-    }
-    if (message.orgName !== "") {
-      writer.uint32(42).string(message.orgName);
-    }
-    if (message.plan !== PlanType.PLAN_TYPE_UNSPECIFIED) {
-      writer.uint32(48).int32(planTypeToNumber(message.plan));
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): WorkspaceTrialSetting {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseWorkspaceTrialSetting();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.instanceCount = reader.int32();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.expireTime = Timestamp.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.issuedTime = Timestamp.decode(reader, reader.uint32());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.subject = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.orgName = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.plan = planTypeFromJSON(reader.int32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): WorkspaceTrialSetting {
-    return {
-      instanceCount: isSet(object.instanceCount) ? globalThis.Number(object.instanceCount) : 0,
-      expireTime: isSet(object.expireTime) ? fromJsonTimestamp(object.expireTime) : undefined,
-      issuedTime: isSet(object.issuedTime) ? fromJsonTimestamp(object.issuedTime) : undefined,
-      subject: isSet(object.subject) ? globalThis.String(object.subject) : "",
-      orgName: isSet(object.orgName) ? globalThis.String(object.orgName) : "",
-      plan: isSet(object.plan) ? planTypeFromJSON(object.plan) : PlanType.PLAN_TYPE_UNSPECIFIED,
-    };
-  },
-
-  toJSON(message: WorkspaceTrialSetting): unknown {
-    const obj: any = {};
-    if (message.instanceCount !== 0) {
-      obj.instanceCount = Math.round(message.instanceCount);
-    }
-    if (message.expireTime !== undefined) {
-      obj.expireTime = fromTimestamp(message.expireTime).toISOString();
-    }
-    if (message.issuedTime !== undefined) {
-      obj.issuedTime = fromTimestamp(message.issuedTime).toISOString();
-    }
-    if (message.subject !== "") {
-      obj.subject = message.subject;
-    }
-    if (message.orgName !== "") {
-      obj.orgName = message.orgName;
-    }
-    if (message.plan !== PlanType.PLAN_TYPE_UNSPECIFIED) {
-      obj.plan = planTypeToJSON(message.plan);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<WorkspaceTrialSetting>): WorkspaceTrialSetting {
-    return WorkspaceTrialSetting.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<WorkspaceTrialSetting>): WorkspaceTrialSetting {
-    const message = createBaseWorkspaceTrialSetting();
-    message.instanceCount = object.instanceCount ?? 0;
-    message.expireTime = (object.expireTime !== undefined && object.expireTime !== null)
-      ? Timestamp.fromPartial(object.expireTime)
-      : undefined;
-    message.issuedTime = (object.issuedTime !== undefined && object.issuedTime !== null)
-      ? Timestamp.fromPartial(object.issuedTime)
-      : undefined;
-    message.subject = object.subject ?? "";
-    message.orgName = object.orgName ?? "";
-    message.plan = object.plan ?? PlanType.PLAN_TYPE_UNSPECIFIED;
     return message;
   },
 };
@@ -5713,32 +5296,6 @@ export type DeepPartial<T> = T extends Builtin ? T
   : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
   : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
   : Partial<T>;
-
-function toTimestamp(date: Date): Timestamp {
-  const seconds = numberToLong(Math.trunc(date.getTime() / 1_000));
-  const nanos = (date.getTime() % 1_000) * 1_000_000;
-  return { seconds, nanos };
-}
-
-function fromTimestamp(t: Timestamp): Date {
-  let millis = (t.seconds.toNumber() || 0) * 1_000;
-  millis += (t.nanos || 0) / 1_000_000;
-  return new globalThis.Date(millis);
-}
-
-function fromJsonTimestamp(o: any): Timestamp {
-  if (o instanceof globalThis.Date) {
-    return toTimestamp(o);
-  } else if (typeof o === "string") {
-    return toTimestamp(new globalThis.Date(o));
-  } else {
-    return Timestamp.fromJSON(o);
-  }
-}
-
-function numberToLong(number: number) {
-  return Long.fromNumber(number);
-}
 
 function isObject(value: any): boolean {
   return typeof value === "object" && value !== null;

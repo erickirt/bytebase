@@ -1,29 +1,31 @@
-import { uniq, without } from "lodash-es";
-import { CheckIcon } from "lucide-vue-next";
-import type { SelectOption } from "naive-ui";
-import { h, type VNode } from "vue";
 import { type OptionConfig } from "@/components/ExprEditor/context";
-import { type Factor, SQLTypeList } from "@/plugins/cel";
+import { SQLTypeList, type Factor } from "@/plugins/cel";
 import { t } from "@/plugins/i18n";
 import {
   environmentNamePrefix,
   useEnvironmentV1Store,
   useProjectV1Store,
+  useRoleStore,
 } from "@/store";
 import {
-  PresetRiskLevelList,
   DEFAULT_PROJECT_NAME,
+  PRESET_WORKSPACE_ROLES,
+  PresetRiskLevelList,
   useSupportedSourceList,
   type ComposedProject,
 } from "@/types";
 import type { Risk } from "@/types/proto/v1/risk_service";
 import { Risk_Source, risk_SourceToJSON } from "@/types/proto/v1/risk_service";
 import {
+  displayRoleTitle,
   engineNameV1,
   extractProjectResourceName,
-  supportedEngineV1List,
   getDefaultPagination,
+  supportedEngineV1List,
 } from "@/utils";
+import { CheckIcon } from "lucide-vue-next";
+import type { SelectOption } from "naive-ui";
+import { h, type VNode } from "vue";
 
 export const sourceText = (source: Risk_Source) => {
   switch (source) {
@@ -37,10 +39,8 @@ export const sourceText = (source: Risk_Source) => {
       return t("custom-approval.risk-rule.risk.namespace.create_database");
     case Risk_Source.DATA_EXPORT:
       return t("custom-approval.risk-rule.risk.namespace.data_export");
-    case Risk_Source.REQUEST_QUERY:
-      return t("custom-approval.risk-rule.risk.namespace.request_query");
-    case Risk_Source.REQUEST_EXPORT:
-      return t("custom-approval.risk-rule.risk.namespace.request_export");
+    case Risk_Source.REQUEST_ROLE:
+      return t("custom-approval.risk-rule.risk.namespace.request-role");
     default:
       return Risk_Source.UNRECOGNIZED;
   }
@@ -67,105 +67,56 @@ export const orderByLevelDesc = (a: Risk, b: Risk): number => {
   return a.name < b.name ? -1 : 1;
 };
 
-const NumberFactorList = [
-  // Risk related factors
-  "affected_rows",
-  "table_rows",
-  "level",
-  "source",
-  "expiration_days",
-  "export_rows",
+const commonFactorList = [
+  "environment_id", // use `environment.resource_id` instead.
+  "project_id", // use `project.resource_id` instead.
+  "db_engine",
 ] as const;
 
-const StringFactorList = [
-  "environment_id", // using `environment.resource_id`
-  "project_id", // using `project.resource_id`
-  "db_engine",
-  "sql_type",
+const schemaObjectNameFactorList = [
   "database_name",
   "schema_name",
   "table_name",
 ] as const;
 
+const migrationFactorList = [
+  "affected_rows",
+  "table_rows",
+  "sql_type",
+  "sql_statement",
+] as const;
+
 export const RiskSourceFactorMap: Map<Risk_Source, string[]> = new Map([
   [
     Risk_Source.DDL,
-    uniq(
-      without(
-        [...NumberFactorList, ...StringFactorList, "sql_statement"],
-        "level",
-        "source",
-        "expiration_days",
-        "export_rows"
-      )
-    ),
+    [
+      ...commonFactorList,
+      ...schemaObjectNameFactorList,
+      ...migrationFactorList,
+    ],
   ],
   [
     Risk_Source.DML,
-    uniq(
-      without(
-        [...NumberFactorList, ...StringFactorList, "sql_statement"],
-        "level",
-        "source",
-        "expiration_days",
-        "export_rows"
-      )
-    ),
+    [
+      ...commonFactorList,
+      ...schemaObjectNameFactorList,
+      ...migrationFactorList,
+    ],
   ],
-  [
-    Risk_Source.CREATE_DATABASE,
-    uniq(
-      without(
-        [...StringFactorList],
-        "sql_type",
-        "schema_name",
-        "table_name",
-        "table_rows",
-        "expiration_days",
-        "export_rows"
-      )
-    ),
-  ],
+  [Risk_Source.CREATE_DATABASE, [...commonFactorList, "database_name"]],
   [
     Risk_Source.DATA_EXPORT,
-    uniq(
-      without(
-        [...StringFactorList, ...NumberFactorList],
-        "level",
-        "affected_rows",
-        "table_rows",
-        "source",
-        "sql_type",
-        "expiration_days"
-      )
-    ),
+    [...commonFactorList, ...schemaObjectNameFactorList, "export_rows"],
   ],
   [
-    Risk_Source.REQUEST_QUERY,
-    uniq(
-      without(
-        [...StringFactorList, ...NumberFactorList],
-        "level",
-        "source",
-        "affected_rows",
-        "table_rows",
-        "sql_type",
-        "export_rows"
-      )
-    ),
-  ],
-  [
-    Risk_Source.REQUEST_EXPORT,
-    uniq(
-      without(
-        [...StringFactorList, ...NumberFactorList],
-        "level",
-        "source",
-        "affected_rows",
-        "table_rows",
-        "sql_type"
-      )
-    ),
+    Risk_Source.REQUEST_ROLE,
+    [
+      "environment_id", // use `environment.resource_id` instead.
+      "project_id", // use `project.resource_id` instead.
+      "expiration_days",
+      "export_rows",
+      "role",
+    ],
   ],
 ]);
 
@@ -262,6 +213,15 @@ const getSQLTypeOptions = (source: Risk_Source) => {
   return [];
 };
 
+const getRoleOptions = () => {
+  return useRoleStore()
+    .roleList.filter((role) => !PRESET_WORKSPACE_ROLES.includes(role.name))
+    .map((role) => ({
+      label: displayRoleTitle(role.name),
+      value: role.name,
+    }));
+};
+
 export const getOptionConfigMap = (source: Risk_Source) => {
   const factorList = getFactorList(source);
   return factorList.reduce((map, factor) => {
@@ -299,6 +259,9 @@ export const getOptionConfigMap = (source: Risk_Source) => {
       case "sql_type":
         options = getSQLTypeOptions(source);
         break;
+      case "role":
+        options = getRoleOptions();
+        break;
     }
     map.set(factor, {
       remote: false,
@@ -315,4 +278,5 @@ export const factorSupportDropdown: Factor[] = [
   "sql_type",
   "level",
   "source",
+  "role",
 ];

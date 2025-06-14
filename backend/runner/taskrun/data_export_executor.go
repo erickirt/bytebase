@@ -10,7 +10,7 @@ import (
 	"github.com/bytebase/bytebase/backend/component/config"
 	"github.com/bytebase/bytebase/backend/component/dbfactory"
 	"github.com/bytebase/bytebase/backend/component/state"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	"github.com/bytebase/bytebase/backend/runner/schemasync"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
@@ -19,7 +19,7 @@ import (
 )
 
 // NewDataExportExecutor creates a data export task executor.
-func NewDataExportExecutor(store *store.Store, dbFactory *dbfactory.DBFactory, license enterprise.LicenseService, stateCfg *state.State, schemaSyncer *schemasync.Syncer, profile *config.Profile) Executor {
+func NewDataExportExecutor(store *store.Store, dbFactory *dbfactory.DBFactory, license *enterprise.LicenseService, stateCfg *state.State, schemaSyncer *schemasync.Syncer, profile *config.Profile) Executor {
 	return &DataExportExecutor{
 		store:        store,
 		dbFactory:    dbFactory,
@@ -34,7 +34,7 @@ func NewDataExportExecutor(store *store.Store, dbFactory *dbfactory.DBFactory, l
 type DataExportExecutor struct {
 	store        *store.Store
 	dbFactory    *dbfactory.DBFactory
-	license      enterprise.LicenseService
+	license      *enterprise.LicenseService
 	stateCfg     *state.State
 	schemaSyncer *schemasync.Syncer
 	profile      *config.Profile
@@ -67,13 +67,14 @@ func (exec *DataExportExecutor) RunOnce(ctx context.Context, _ context.Context, 
 		return true, nil, err
 	}
 
+	dataSource := apiv1.GetQueriableDataSource(instance)
 	exportRequest := &v1pb.ExportRequest{
 		Name:      common.FormatDatabase(instance.ResourceID, database.DatabaseName),
 		Statement: statement,
 		Format:    v1pb.ExportFormat(task.Payload.GetFormat()),
-		Password:  task.Payload.GetPassword(),
+		Password:  "", /* do not pass the password, we will encrypt the files will password when users download them */
 	}
-	bytes, _, exportErr := apiv1.DoExport(ctx, exec.store, exec.dbFactory, exec.license, exportRequest, issue.Creator /* user */, instance, database, nil, exec.schemaSyncer)
+	bytes, _, exportErr := apiv1.DoExport(ctx, exec.store, exec.dbFactory, exec.license, exportRequest, issue.Creator /* user */, instance, database, nil, exec.schemaSyncer, dataSource)
 	if exportErr != nil {
 		return true, nil, errors.Wrap(exportErr, "failed to export data")
 	}

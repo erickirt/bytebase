@@ -105,15 +105,17 @@ export interface ListInstancesRequest {
   showDeleted: boolean;
   /**
    * Filter the instance.
+   * The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+   *
    * Supported filters:
-   * - name
-   * - resource_id
-   * - environment
-   * - state
-   * - engine
-   * - host
-   * - port
-   * - project
+   * - name: the instance name, support "==" and ".matches()" operator.
+   * - resource_id: the instance id, support "==" and ".matches()" operator.
+   * - environment: the environment full name in "environments/{id}" format, support "==" operator.
+   * - state: the instance state, check State enum for values, support "==" operator.
+   * - engine: the instance engine, check Engine enum for values. Support "==", "in [xx]", "!(in [xx])" operator.
+   * - host: the instance host, support "==" and ".matches()" operator.
+   * - port: the instance port, support "==" and ".matches()" operator.
+   * - project: the project full name in "projects/{id}" format, support "==" operator.
    *
    * For example:
    * name == "sample instance"
@@ -126,7 +128,9 @@ export interface ListInstancesRequest {
    * engine in ["MYSQL", "POSTGRES"]
    * !(engine in ["MYSQL", "POSTGRES"])
    * host == "127.0.0.1"
+   * host.matches("127.0")
    * port == "54321"
+   * port.matches("543")
    * project == "projects/sample-project"
    * You can combine filter conditions like:
    * name.matches("sample") && environment == "environments/test"
@@ -236,6 +240,15 @@ export interface BatchSyncInstancesRequest {
 }
 
 export interface BatchSyncInstancesResponse {
+}
+
+export interface BatchUpdateInstancesRequest {
+  /** The request message specifying the resources to update. */
+  requests: UpdateInstanceRequest[];
+}
+
+export interface BatchUpdateInstancesResponse {
+  instances: Instance[];
 }
 
 export interface AddDataSourceRequest {
@@ -1710,6 +1723,130 @@ export const BatchSyncInstancesResponse: MessageFns<BatchSyncInstancesResponse> 
   },
   fromPartial(_: DeepPartial<BatchSyncInstancesResponse>): BatchSyncInstancesResponse {
     const message = createBaseBatchSyncInstancesResponse();
+    return message;
+  },
+};
+
+function createBaseBatchUpdateInstancesRequest(): BatchUpdateInstancesRequest {
+  return { requests: [] };
+}
+
+export const BatchUpdateInstancesRequest: MessageFns<BatchUpdateInstancesRequest> = {
+  encode(message: BatchUpdateInstancesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.requests) {
+      UpdateInstanceRequest.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BatchUpdateInstancesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBatchUpdateInstancesRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.requests.push(UpdateInstanceRequest.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BatchUpdateInstancesRequest {
+    return {
+      requests: globalThis.Array.isArray(object?.requests)
+        ? object.requests.map((e: any) => UpdateInstanceRequest.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: BatchUpdateInstancesRequest): unknown {
+    const obj: any = {};
+    if (message.requests?.length) {
+      obj.requests = message.requests.map((e) => UpdateInstanceRequest.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BatchUpdateInstancesRequest>): BatchUpdateInstancesRequest {
+    return BatchUpdateInstancesRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BatchUpdateInstancesRequest>): BatchUpdateInstancesRequest {
+    const message = createBaseBatchUpdateInstancesRequest();
+    message.requests = object.requests?.map((e) => UpdateInstanceRequest.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseBatchUpdateInstancesResponse(): BatchUpdateInstancesResponse {
+  return { instances: [] };
+}
+
+export const BatchUpdateInstancesResponse: MessageFns<BatchUpdateInstancesResponse> = {
+  encode(message: BatchUpdateInstancesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.instances) {
+      Instance.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BatchUpdateInstancesResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBatchUpdateInstancesResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.instances.push(Instance.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BatchUpdateInstancesResponse {
+    return {
+      instances: globalThis.Array.isArray(object?.instances)
+        ? object.instances.map((e: any) => Instance.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: BatchUpdateInstancesResponse): unknown {
+    const obj: any = {};
+    if (message.instances?.length) {
+      obj.instances = message.instances.map((e) => Instance.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BatchUpdateInstancesResponse>): BatchUpdateInstancesResponse {
+    return BatchUpdateInstancesResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BatchUpdateInstancesResponse>): BatchUpdateInstancesResponse {
+    const message = createBaseBatchUpdateInstancesResponse();
+    message.instances = object.instances?.map((e) => Instance.fromPartial(e)) || [];
     return message;
   },
 };
@@ -4420,6 +4557,78 @@ export const InstanceServiceDefinition = {
               121,
               110,
               99,
+            ]),
+          ],
+        },
+      },
+    },
+    batchUpdateInstances: {
+      name: "BatchUpdateInstances",
+      requestType: BatchUpdateInstancesRequest,
+      requestStream: false,
+      responseType: BatchUpdateInstancesResponse,
+      responseStream: false,
+      options: {
+        _unknownFields: {
+          800010: [
+            new Uint8Array([
+              19,
+              98,
+              98,
+              46,
+              105,
+              110,
+              115,
+              116,
+              97,
+              110,
+              99,
+              101,
+              115,
+              46,
+              117,
+              112,
+              100,
+              97,
+              116,
+              101,
+            ]),
+          ],
+          800016: [new Uint8Array([1])],
+          800024: [new Uint8Array([1])],
+          578365826: [
+            new Uint8Array([
+              30,
+              58,
+              1,
+              42,
+              34,
+              25,
+              47,
+              118,
+              49,
+              47,
+              105,
+              110,
+              115,
+              116,
+              97,
+              110,
+              99,
+              101,
+              115,
+              58,
+              98,
+              97,
+              116,
+              99,
+              104,
+              85,
+              112,
+              100,
+              97,
+              116,
+              101,
             ]),
           ],
         },

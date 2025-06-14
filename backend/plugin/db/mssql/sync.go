@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -91,6 +91,26 @@ func (d *Driver) SyncDBSchema(ctx context.Context) (*storepb.DatabaseSchemaMetad
 	procedureMap, err := getProcedures(txn)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get procedures from database %q", d.databaseName)
+	}
+	tableTriggers, viewTriggers, err := getTriggers(txn)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get triggers from database %q", d.databaseName)
+	}
+	for schemaName, tables := range tableMap {
+		for i := range tables {
+			table := tables[i]
+			if triggers, ok := tableTriggers[db.TableKey{Schema: schemaName, Table: table.Name}]; ok {
+				table.Triggers = append(table.Triggers, triggers...)
+			}
+		}
+	}
+	for schemaName, views := range viewMap {
+		for i := range views {
+			view := views[i]
+			if triggers, ok := viewTriggers[db.TableKey{Schema: schemaName, Table: view.Name}]; ok {
+				view.Triggers = append(view.Triggers, triggers...)
+			}
+		}
 	}
 
 	if err := txn.Commit(); err != nil {
@@ -340,7 +360,7 @@ func getForeignKeys(txn *sql.Tx, schemas []string) (map[db.TableKey][]*storepb.F
 		for _, v := range m {
 			foreignkeyNames = append(foreignkeyNames, v.Name)
 		}
-		sort.Strings(foreignkeyNames)
+		slices.Sort(foreignkeyNames)
 		for _, fkName := range foreignkeyNames {
 			result[k] = append(result[k], m[fkName])
 		}
@@ -603,8 +623,14 @@ func getIndexes(txn *sql.Tx, schemas []string) (map[db.TableKey][]*storepb.Index
 		for _, v := range m {
 			tableIndexes[k] = append(tableIndexes[k], v)
 		}
-		sort.Slice(tableIndexes[k], func(i, j int) bool {
-			return tableIndexes[k][i].Name < tableIndexes[k][j].Name
+		slices.SortFunc(tableIndexes[k], func(a, b *storepb.IndexMetadata) int {
+			if a.Name < b.Name {
+				return -1
+			}
+			if a.Name > b.Name {
+				return 1
+			}
+			return 0
 		})
 	}
 	return tableIndexes, nil
@@ -693,8 +719,14 @@ func getKeys(txn *sql.Tx, schemas []string) (map[db.TableKey][]*storepb.IndexMet
 		for _, v := range m {
 			tableIndexes[k] = append(tableIndexes[k], v)
 		}
-		sort.Slice(tableIndexes[k], func(i, j int) bool {
-			return tableIndexes[k][i].Name < tableIndexes[k][j].Name
+		slices.SortFunc(tableIndexes[k], func(a, b *storepb.IndexMetadata) int {
+			if a.Name < b.Name {
+				return -1
+			}
+			if a.Name > b.Name {
+				return 1
+			}
+			return 0
 		})
 	}
 	return tableIndexes, nil
@@ -765,6 +797,78 @@ func getViews(txn *sql.Tx, columnMap map[db.TableKey][]*storepb.ColumnMetadata) 
 	return viewMap, nil
 }
 
+func getTriggers(txn *sql.Tx) (map[db.TableKey][]*storepb.TriggerMetadata, map[db.TableKey][]*storepb.TriggerMetadata, error) {
+	query := `
+SELECT
+    st.name,
+    STUFF((
+        SELECT ',' + te.type_desc
+        FROM sys.trigger_events AS te
+        WHERE te.object_id = st.object_id
+        FOR XML PATH('')
+    ), 1, 1, '') AS events,
+CASE
+        WHEN st.type = 'TR' THEN 'AFTER' -- DML triggers created with FOR or AFTER
+        WHEN st.type = 'TA' THEN 'AFTER' -- DDL triggers
+        WHEN st.type = 'TI' THEN 'INSTEAD OF' -- INSTEAD OF triggers
+        ELSE 'UNKNOWN' -- Handle other potential types
+END AS timing,
+ssm.definition AS body,
+so.name AS parentName,
+ss.name AS schemaName,
+so.type AS objectType
+FROM
+    sys.triggers AS st
+JOIN
+    sys.sql_modules AS ssm
+ON
+    st.object_id = ssm.object_id
+JOIN
+    sys.objects AS so
+ON
+    st.parent_id = so.object_id
+JOIN
+    sys.schemas AS ss
+ON so.schema_id = ss.schema_id
+WHERE st.is_disabled = 0 AND st.is_ms_shipped = 0 AND st.parent_id <> 0 AND  so.type IN ('U', 'V')
+ORDER BY st.name;
+`
+	tableTriggers := make(map[db.TableKey][]*storepb.TriggerMetadata)
+	viewTriggers := make(map[db.TableKey][]*storepb.TriggerMetadata)
+	rows, err := txn.Query(query)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, events, timing, parentName, schemaName, parentType string
+		var body sql.NullString
+		if err := rows.Scan(&name, &events, &timing, &body, &parentName, &schemaName, &parentType); err != nil {
+			return nil, nil, err
+		}
+		bodyString := fmt.Sprintf("/* Definition of trigger %s.%s.%s is encrypted. */", schemaName, parentName, name)
+		if body.Valid {
+			bodyString = body.String
+		}
+		m := tableTriggers
+		if parentType == "V" {
+			m = viewTriggers
+		}
+		trigger := &storepb.TriggerMetadata{
+			Name:   name,
+			Event:  events,
+			Timing: timing,
+			Body:   bodyString,
+		}
+		key := db.TableKey{Schema: schemaName, Table: parentName}
+		m[key] = append(m[key], trigger)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+	return tableTriggers, viewTriggers, nil
+}
+
 // getSequences gets all sequences of a database.
 func getSequences(txn *sql.Tx) (map[string][]*storepb.SequenceMetadata, error) {
 	query := `
@@ -804,7 +908,6 @@ func getSequences(txn *sql.Tx) (map[string][]*storepb.SequenceMetadata, error) {
 func getProcedures(txn *sql.Tx) (map[string][]*storepb.ProcedureMetadata, error) {
 	procedureMap := make(map[string][]*storepb.ProcedureMetadata)
 
-	// The CAST(...) = 0 means the procedure is not a system function.
 	query := `
 	SELECT
 		SCHEMA_NAME(ao.schema_id) AS schema_name,

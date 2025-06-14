@@ -4,37 +4,40 @@
       <label>
         {{ $t("environment.access-control.title") }}
       </label>
-      <FeatureBadge feature="bb.feature.access-control" />
     </div>
     <div>
       <div class="w-full inline-flex items-center gap-x-2">
         <Switch
           v-model:value="state.disableCopyDataPolicy.active"
           :text="true"
-          :disabled="!allowUpdatePolicy || !hasAccessControlFeature"
+          :disabled="!allowUpdatePolicy || !hasRestrictCopyingDataFeature"
         />
         <span class="textlabel">{{
           $t("environment.access-control.disable-copy-data-from-sql-editor")
         }}</span>
+        <FeatureBadge :feature="PlanFeature.FEATURE_RESTRICT_COPYING_DATA" />
       </div>
       <div class="">
         <div class="w-full inline-flex items-center gap-x-2">
           <Switch
-            :value="adminDataSourceQueruRestrictionEnabled"
+            :value="adminDataSourceQueryRestrictionEnabled"
             :text="true"
-            :disabled="!allowUpdatePolicy || !hasAccessControlFeature"
+            :disabled="!allowUpdatePolicy || !hasRestrictQueryDataSourceFeature"
             @update:value="switchDataSourceQueryPolicyEnabled"
           />
           <span class="textlabel">{{
             $t("environment.access-control.restrict-admin-connection.self")
           }}</span>
+          <FeatureBadge
+            :feature="PlanFeature.FEATURE_QUERY_POLICY"
+          />
         </div>
-        <div v-if="adminDataSourceQueruRestrictionEnabled" class="ml-12">
+        <div v-if="adminDataSourceQueryRestrictionEnabled" class="ml-12">
           <NRadioGroup
             v-model:value="
               state.dataSourceQueryPolicy.adminDataSourceRestriction
             "
-            :disabled="!allowUpdatePolicy || !hasAccessControlFeature"
+            :disabled="!allowUpdatePolicy || !hasRestrictQueryDataSourceFeature"
           >
             <NRadio
               class="w-full"
@@ -69,13 +72,16 @@
       <label>
         {{ $t("environment.statement-execution.title") }}
       </label>
+      <FeatureBadge
+        :feature="PlanFeature.FEATURE_QUERY_POLICY"
+      />
     </div>
     <div>
       <div class="w-full inline-flex items-center gap-x-2">
         <Switch
           v-model:value="state.dataSourceQueryPolicy.disallowDdl"
           :text="true"
-          :disabled="!allowUpdatePolicy"
+          :disabled="!allowUpdatePolicy || !hasRestrictDDLDMLFeature"
         />
         <span class="textlabel">
           {{ $t("environment.statement-execution.disallow-ddl") }}
@@ -85,7 +91,7 @@
         <Switch
           v-model:value="state.dataSourceQueryPolicy.disallowDml"
           :text="true"
-          :disabled="!allowUpdatePolicy"
+          :disabled="!allowUpdatePolicy || !hasRestrictDDLDMLFeature"
         />
         <span class="textlabel">
           {{ $t("environment.statement-execution.disallow-dml") }}
@@ -96,17 +102,18 @@
 </template>
 
 <script setup lang="ts">
-import { isEqual, cloneDeep } from "lodash-es";
-import { NRadioGroup, NRadio } from "naive-ui";
-import { computed, watchEffect, reactive } from "vue";
+import { cloneDeep, isEqual } from "lodash-es";
+import { NRadio, NRadioGroup } from "naive-ui";
+import { computed, reactive, watchEffect } from "vue";
 import { hasFeature, usePolicyV1Store } from "@/store";
 import { environmentNamePrefix } from "@/store/modules/v1/common";
 import {
   DataSourceQueryPolicy,
-  DisableCopyDataPolicy,
   DataSourceQueryPolicy_Restriction,
+  DisableCopyDataPolicy,
   PolicyType,
 } from "@/types/proto/v1/org_policy_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
 import { FeatureBadge } from "../FeatureGuard";
 import { Switch } from "../v2";
@@ -157,7 +164,7 @@ watchEffect(async () => {
   Object.assign(state, getInitialState());
 });
 
-const adminDataSourceQueruRestrictionEnabled = computed(() => {
+const adminDataSourceQueryRestrictionEnabled = computed(() => {
   return (
     state.dataSourceQueryPolicy.adminDataSourceRestriction &&
     [
@@ -167,8 +174,16 @@ const adminDataSourceQueruRestrictionEnabled = computed(() => {
   );
 });
 
-const hasAccessControlFeature = computed(() =>
-  hasFeature("bb.feature.access-control")
+const hasRestrictQueryDataSourceFeature = computed(() =>
+  hasFeature(PlanFeature.FEATURE_QUERY_POLICY)
+);
+
+const hasRestrictCopyingDataFeature = computed(() =>
+  hasFeature(PlanFeature.FEATURE_RESTRICT_COPYING_DATA)
+);
+
+const hasRestrictDDLDMLFeature = computed(() =>
+  hasFeature(PlanFeature.FEATURE_QUERY_POLICY)
 );
 
 const allowUpdatePolicy = computed(() => {

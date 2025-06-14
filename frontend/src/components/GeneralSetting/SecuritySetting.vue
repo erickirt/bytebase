@@ -22,7 +22,7 @@
           <span class="font-medium">
             {{ $t("settings.general.workspace.watermark.enable") }}
           </span>
-          <FeatureBadge feature="bb.feature.watermark" />
+          <FeatureBadge :feature="PlanFeature.FEATURE_WATERMARK" />
         </div>
         <div class="mt-1 mb-3 text-sm text-gray-400">
           {{ $t("settings.general.workspace.watermark.description") }}
@@ -33,12 +33,11 @@
           <Switch
             v-model:value="state.enableDataExport"
             :text="true"
-            :disabled="!allowEdit || !hasAccessControlFeature"
+            :disabled="!allowEdit"
           />
           <span class="font-medium">
             {{ $t("settings.general.workspace.data-export.enable") }}
           </span>
-          <FeatureBadge feature="bb.feature.access-control" />
         </div>
         <div class="mt-1 mb-3 text-sm text-gray-400">
           {{ $t("settings.general.workspace.data-export.description") }}
@@ -65,12 +64,6 @@
       />
     </div>
   </div>
-
-  <FeatureModal
-    :open="!!state.featureNameForModal"
-    :feature="state.featureNameForModal"
-    @cancel="state.featureNameForModal = undefined"
-  />
 </template>
 
 <script lang="ts" setup>
@@ -79,16 +72,17 @@ import { computed, reactive, ref } from "vue";
 import { Switch } from "@/components/v2";
 import {
   featureToRef,
-  useSettingV1Store,
-  usePolicyV1Store,
   usePolicyByParentAndType,
+  usePolicyV1Store,
+  useSettingV1Store,
 } from "@/store";
-import type { FeatureType } from "@/types";
 import {
-  PolicyType,
   PolicyResourceType,
+  PolicyType,
 } from "@/types/proto/v1/org_policy_service";
-import { FeatureBadge, FeatureModal } from "../FeatureGuard";
+import { Setting_SettingName } from "@/types/proto/v1/setting_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
+import { FeatureBadge } from "../FeatureGuard";
 import DomainRestrictionSetting from "./DomainRestrictionSetting.vue";
 import MaximumRoleExpirationSetting from "./MaximumRoleExpirationSetting.vue";
 import MaximumSQLResultSizeSetting from "./MaximumSQLResultSizeSetting.vue";
@@ -96,7 +90,6 @@ import QueryDataPolicySetting from "./QueryDataPolicySetting.vue";
 import RestrictIssueCreationConfigure from "./RestrictIssueCreationConfigure.vue";
 
 interface LocalState {
-  featureNameForModal?: FeatureType;
   enableWatermark: boolean;
   enableDataExport: boolean;
 }
@@ -108,8 +101,7 @@ const props = defineProps<{
 
 const settingV1Store = useSettingV1Store();
 const policyV1Store = usePolicyV1Store();
-const hasWatermarkFeature = featureToRef("bb.feature.branding");
-const hasAccessControlFeature = featureToRef("bb.feature.access-control");
+const hasWatermarkFeature = featureToRef(PlanFeature.FEATURE_WATERMARK);
 
 const domainRestrictionSettingRef =
   ref<InstanceType<typeof DomainRestrictionSetting>>();
@@ -140,7 +132,7 @@ const { policy: exportDataPolicy } = usePolicyByParentAndType(
 const getInitialState = (): LocalState => {
   return {
     enableWatermark:
-      settingV1Store.getSettingByName("bb.workspace.watermark")?.value
+      settingV1Store.getSettingByName(Setting_SettingName.WATERMARK)?.value
         ?.stringValue === "1",
     enableDataExport: !exportDataPolicy.value?.exportDataPolicy?.disable,
   };
@@ -173,7 +165,7 @@ const handleDataExportToggle = async () => {
 const handleWatermarkToggle = async () => {
   const value = state.enableWatermark ? "1" : "0";
   await settingV1Store.upsertSetting({
-    name: "bb.workspace.watermark",
+    name: Setting_SettingName.WATERMARK,
     value: {
       stringValue: value,
     },

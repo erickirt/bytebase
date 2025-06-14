@@ -3,7 +3,8 @@
 <template>
   <div
     v-if="instanceMissingLicense"
-    :class="['text-accent cursor-pointer', customClass]"
+    class="text-accent cursor-pointer"
+    v-bind="$attrs"
     @click="
       (e: MouseEvent) => {
         e.stopPropagation();
@@ -21,7 +22,7 @@
       </span>
     </NTooltip>
   </div>
-  <div v-else-if="!hasFeature" :class="['text-accent', customClass]">
+  <div v-else-if="!hasFeature" class="text-accent" v-bind="$attrs">
     <NTooltip :show-arrow="true">
       <template #trigger>
         <router-link
@@ -39,9 +40,9 @@
         {{
           $t("subscription.require-subscription", {
             requiredPlan: $t(
-              `subscription.plan.${planTypeToString(
-                subscriptionStore.getMinimumRequiredPlan(feature)
-              )}.title`
+              `subscription.plan.${
+                subscriptionStore.getMinimumRequiredPlan(feature).toLowerCase()
+              }.title`
             ),
           })
         }}
@@ -57,15 +58,13 @@
 
 <script lang="ts" setup>
 import { NTooltip } from "naive-ui";
-import type { PropType } from "vue";
 import { reactive, computed } from "vue";
 import { useSubscriptionV1Store } from "@/store";
-import type { FeatureType } from "@/types";
-import { planTypeToString } from "@/types";
 import type {
   Instance,
   InstanceResource,
 } from "@/types/proto/v1/instance_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import { autoSubscriptionRoute, hasWorkspacePermissionV2 } from "@/utils";
 import InstanceAssignment from "../InstanceAssignment.vue";
 
@@ -73,25 +72,19 @@ interface LocalState {
   showInstanceAssignmentDrawer: boolean;
 }
 
-const props = defineProps({
-  feature: {
-    required: true,
-    type: String as PropType<FeatureType>,
-  },
-  instance: {
-    type: Object as PropType<Instance | InstanceResource>,
-    default: undefined,
-  },
-  customClass: {
-    require: false,
-    default: "",
-    type: String,
-  },
-  clickable: {
-    type: Boolean,
-    default: false,
-  },
-});
+const props = withDefaults(
+  defineProps<{
+    feature: PlanFeature;
+    instance?: Instance | InstanceResource;
+    showInstanceMissingLicense?: boolean;
+    clickable?: boolean;
+  }>(),
+  {
+    instance: undefined,
+    clickable: false,
+    showInstanceMissingLicense: false,
+  }
+);
 
 const state = reactive<LocalState>({
   showInstanceAssignmentDrawer: false,
@@ -100,13 +93,13 @@ const state = reactive<LocalState>({
 const subscriptionStore = useSubscriptionV1Store();
 
 const hasFeature = computed(() => {
-  return subscriptionStore.hasInstanceFeature(props.feature, props.instance);
+  return subscriptionStore.hasInstanceFeature(props.feature);
 });
 
 const instanceMissingLicense = computed(() => {
-  return subscriptionStore.instanceMissingLicense(
-    props.feature,
-    props.instance
+  return (
+    props.showInstanceMissingLicense ||
+    subscriptionStore.instanceMissingLicense(props.feature, props.instance)
   );
 });
 

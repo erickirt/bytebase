@@ -23,14 +23,20 @@
           :readonly="!create"
           :value="state.environment.id"
           :resource-title="state.environment.title"
-          :validate="validateResourceId"
+          :fetch-resource="
+            (id) =>
+              environmentStore.getOrFetchEnvironmentByName(
+                `${environmentNamePrefix}${id}`,
+                true /* silent */
+              )
+          "
         />
       </div>
 
       <div v-if="features.includes('TIER')" class="flex flex-col gap-y-2">
         <label class="font-medium flex items-center">
           {{ $t("policy.environment-tier.name") }}
-          <FeatureBadge feature="bb.feature.environment-tier-policy" />
+          <FeatureBadge :feature="PlanFeature.FEATURE_ENVIRONMENT_TIERS" />
         </label>
         <p class="text-sm text-gray-600">
           <i18n-t tag="span" keypath="policy.environment-tier.description">
@@ -38,7 +44,7 @@
           </i18n-t>
           <a
             class="inline-flex items-center text-blue-600 ml-1 hover:underline"
-            href="https://www.bytebase.com/docs/administration/environment-policy/overview/?source=console#environment-tier"
+            href="https://docs.bytebase.com/administration/environment-policy/overview/?source=console#environment-tier"
             target="_blank"
             >{{ $t("common.learn-more")
             }}<heroicons-outline:external-link class="w-4 h-4"
@@ -75,10 +81,10 @@
           </span>
         </div>
         <div class="textinfolabel">
-          {{ $t("policy.rollout.info") }}
+          {{ $t("policy.rollout.info", { permission: "bb.taskRuns.create" }) }}
           <a
             class="inline-flex items-center text-blue-600 ml-1 hover:underline"
-            href="https://www.bytebase.com/docs/administration/environment-policy/rollout-policy"
+            href="https://docs.bytebase.com/administration/environment-policy/rollout-policy"
             target="_blank"
           >
             {{ $t("common.learn-more") }}
@@ -129,7 +135,6 @@
 
 <script lang="tsx" setup>
 import { NCheckbox, NInput, NColorPicker } from "naive-ui";
-import { Status } from "nice-grpc-common";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { BBButtonConfirm } from "@/bbkit";
@@ -141,8 +146,7 @@ import {
   pushNotification,
 } from "@/store";
 import { environmentNamePrefix } from "@/store/modules/v1/common";
-import type { ResourceId, ValidatedMessage } from "@/types";
-import { getErrorCode } from "@/utils/grpcweb";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import { FeatureBadge } from "../FeatureGuard";
 import SQLReviewForResource from "../SQLReview/components/SQLReviewForResource.vue";
 import { ResourceIdField } from "../v2";
@@ -180,6 +184,7 @@ const {
   resourceIdField,
 } = useEnvironmentFormContext();
 const environmentList = useEnvironmentV1List();
+const environmentStore = useEnvironmentV1Store();
 
 const accessControlConfigureRef =
   ref<InstanceType<typeof AccessControlConfigure>>();
@@ -201,7 +206,7 @@ watch(
 );
 
 const hasEnvironmentPolicyFeature = computed(() =>
-  hasFeature("bb.feature.environment-tier-policy")
+  hasFeature(PlanFeature.FEATURE_ENVIRONMENT_TIERS)
 );
 
 const allowArchive = computed(() => {
@@ -237,43 +242,13 @@ const renderColorPicker = () => {
       }}
       onUpdateValue={(color: string) => {
         if (!hasEnvironmentPolicyFeature.value) {
-          missingFeature.value = "bb.feature.environment-tier-policy";
+          missingFeature.value = PlanFeature.FEATURE_ENVIRONMENT_TIERS;
           return;
         }
         state.value.environment.color = color;
       }}
     />
   );
-};
-
-const validateResourceId = async (
-  resourceId: ResourceId
-): Promise<ValidatedMessage[]> => {
-  if (!resourceId) {
-    return [];
-  }
-
-  try {
-    const env = await useEnvironmentV1Store().getOrFetchEnvironmentByName(
-      environmentNamePrefix + resourceId,
-      true /* silent */
-    );
-    if (env) {
-      return [
-        {
-          type: "error",
-          message: t("resource-id.validation.duplicated", {
-            resource: t("resource.environment"),
-          }),
-        },
-      ];
-    }
-  } catch (error) {
-    if (getErrorCode(error) !== Status.NOT_FOUND) {
-      throw error;
-    }
-  }
-  return [];
 };
 
 const deleteEnvironment = () => {

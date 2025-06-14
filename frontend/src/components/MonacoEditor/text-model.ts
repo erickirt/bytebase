@@ -1,35 +1,35 @@
-import { Uri, editor } from "monaco-editor";
-import slug from "slug";
+import type * as MonacoType from "monaco-editor";
 import { isRef, markRaw, ref, shallowRef, unref, watch } from "vue";
 import type { Language, MaybeRef } from "@/types";
 import { MonacoEditorReady } from "./editor";
+import { getMonacoEditor } from "./lazy-editor";
 
 const ready = ref(false);
 
 MonacoEditorReady.then(() => (ready.value = true));
 
-// Store TextModel uniq by filename
-const TextModelMapByFilename = new Map<string, editor.ITextModel>();
+// Store TextModel uniq by filename.
+const TextModelMapByFilename = new Map<string, MonacoType.editor.ITextModel>();
 
-export const getUriByFilename = (filename: string) => {
-  const normalizedFilename = slug(filename);
-  return Uri.parse(`/workspace/${normalizedFilename}`);
+export const getUriByFilename = async (filename: string) => {
+  const monaco = await getMonacoEditor();
+  return monaco.Uri.parse(`file:///workspace/${filename}`);
 };
 
-const createTextModel = (
+const createTextModel = async (
   filename: string,
   content: string,
   language: string
 ) => {
   console.debug("[createTextModel]", filename);
-  const normalizedFilename = slug(filename);
-  if (TextModelMapByFilename.has(normalizedFilename)) {
-    return TextModelMapByFilename.get(normalizedFilename)!;
+  if (TextModelMapByFilename.has(filename)) {
+    return TextModelMapByFilename.get(filename)!;
   }
 
-  const uri = getUriByFilename(filename);
-  const model = editor.createModel(content, language, uri);
-  TextModelMapByFilename.set(normalizedFilename, model);
+  const monaco = await getMonacoEditor();
+  const uri = await getUriByFilename(filename);
+  const model = monaco.editor.createModel(content, language, uri);
+  TextModelMapByFilename.set(filename, model);
   return model;
 };
 
@@ -39,19 +39,21 @@ export const useMonacoTextModel = (
   language: MaybeRef<Language>,
   sync: boolean = true
 ) => {
-  const model = shallowRef<editor.ITextModel>();
+  const model = shallowRef<MonacoType.editor.ITextModel>();
 
   watch(
     [ready, () => unref(filename), () => unref(language)],
-    ([ready, filename, language]) => {
+    async ([ready, filename, language]) => {
       if (!ready) return;
-      const m = markRaw(createTextModel(filename, unref(content), language));
+      const m = markRaw(
+        await createTextModel(filename, unref(content), language)
+      );
 
       if (sync && isRef(content)) {
         m.onDidChangeContent(() => {
           const c = m.getValue();
           if (c !== content.value) {
-            // Write-back edited content to content ref
+            // Write-back edited content to content ref.
             content.value = c;
           }
         });

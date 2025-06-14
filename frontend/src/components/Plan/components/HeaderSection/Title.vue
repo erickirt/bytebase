@@ -1,7 +1,7 @@
 <template>
   <div class="flex-1">
     <NInput
-      :value="state.title"
+      v-model:value="state.title"
       :style="style"
       :loading="state.isUpdating"
       :disabled="!allowEdit || state.isUpdating"
@@ -19,10 +19,15 @@
 <script setup lang="ts">
 import { NInput } from "naive-ui";
 import type { CSSProperties } from "vue";
-import { computed, reactive, watch } from "vue";
+import { computed, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import { planServiceClient } from "@/grpcweb";
-import { pushNotification, useCurrentUserV1, extractUserId } from "@/store";
+import {
+  pushNotification,
+  useCurrentUserV1,
+  extractUserId,
+  useCurrentProjectV1,
+} from "@/store";
 import { Plan } from "@/types/proto/v1/plan_service";
 import { hasProjectPermissionV2 } from "@/utils";
 import { usePlanContext } from "../../logic";
@@ -31,6 +36,7 @@ type ViewMode = "EDIT" | "VIEW";
 
 const { t } = useI18n();
 const currentUser = useCurrentUserV1();
+const { project } = useCurrentProjectV1();
 const { isCreating, plan } = usePlanContext();
 
 const state = reactive({
@@ -65,14 +71,12 @@ const allowEdit = computed(() => {
   if (isCreating.value) {
     return true;
   }
-
+  // Allowed if current user is the creator.
   if (extractUserId(plan.value.creator) === currentUser.value.email) {
-    // Allowed if current user is the creator.
     return true;
   }
-
-  if (hasProjectPermissionV2(plan.value.projectEntity, "bb.plans.update")) {
-    // Allowed if current has plan update permission in the project
+  // Allowed if current user has related permission.
+  if (hasProjectPermissionV2(project.value, "bb.plans.update")) {
     return true;
   }
   return false;
@@ -94,7 +98,7 @@ const onBlur = async () => {
   }
   try {
     state.isUpdating = true;
-    const planPatch = Plan.fromJSON({
+    const planPatch = Plan.fromPartial({
       ...plan.value,
       title: state.title,
     });
@@ -118,19 +122,12 @@ const onEnter = (e: Event) => {
   input.blur();
 };
 
-const onUpdateValue = (title: string) => {
-  state.title = title;
-  if (isCreating.value) {
-    plan.value.title = title;
+const onUpdateValue = (value: string) => {
+  if (!isCreating.value) {
+    return;
   }
+  plan.value.title = value;
 };
-
-watch(
-  () => plan.value.title,
-  (title) => {
-    state.title = title;
-  }
-);
 </script>
 
 <style>

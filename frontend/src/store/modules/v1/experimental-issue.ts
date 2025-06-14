@@ -1,16 +1,14 @@
 import { orderBy } from "lodash-es";
-import { ref, watch, type WatchCallback } from "vue";
 import {
   issueServiceClient,
   planServiceClient,
   rolloutServiceClient,
 } from "@/grpcweb";
-import { useProjectV1Store, useUserStore, batchGetOrFetchUsers } from "@/store";
+import { useProjectV1Store } from "@/store";
 import type { ComposedIssue, ComposedProject, ComposedTaskRun } from "@/types";
 import {
   emptyIssue,
   emptyRollout,
-  unknownUser,
   EMPTY_ID,
   unknownIssue,
   UNKNOWN_ID,
@@ -30,16 +28,9 @@ export const composeIssue = async (
   rawIssue: Issue,
   config: ComposeIssueConfig = { withPlan: true, withRollout: true }
 ): Promise<ComposedIssue> => {
-  const userStore = useUserStore();
-
   const project = `projects/${extractProjectResourceName(rawIssue.name)}`;
-  const [projectEntity, creatorEntity, _] = await Promise.all([
-    useProjectV1Store().getOrFetchProjectByName(project),
-    userStore
-      .getOrFetchUserByIdentifier(rawIssue.creator)
-      .then((user) => user ?? unknownUser()),
-    batchGetOrFetchUsers(rawIssue.subscribers),
-  ]);
+  const projectEntity =
+    await useProjectV1Store().getOrFetchProjectByName(project);
 
   const issue: ComposedIssue = {
     ...rawIssue,
@@ -48,8 +39,6 @@ export const composeIssue = async (
     rolloutEntity: emptyRollout(),
     rolloutTaskRunList: [],
     project,
-    projectEntity,
-    creatorEntity,
   };
 
   if (config.withPlan && issue.plan) {
@@ -108,7 +97,7 @@ export const shallowComposeIssue = async (
 
 export const experimentalFetchIssueByUID = async (
   uid: string,
-  project = "-"
+  project: string
 ) => {
   if (uid === "undefined") {
     console.warn("undefined issue uid");
@@ -119,7 +108,7 @@ export const experimentalFetchIssueByUID = async (
   if (uid === String(UNKNOWN_ID)) return unknownIssue();
 
   const rawIssue = await issueServiceClient.getIssue({
-    name: `projects/${project}/issues/${uid}`,
+    name: `${project}/issues/${uid}`,
   });
 
   return composeIssue(rawIssue);
@@ -158,12 +147,4 @@ export const experimentalCreateIssueByPlan = async (
   await hooks?.rolloutCreated?.(createdIssue, createdPlan, createdRollout);
 
   return { createdPlan, createdIssue, createdRollout };
-};
-
-const REFRESH_PLAN_LIST = ref(Math.random());
-export const refreshPlanList = () => {
-  REFRESH_PLAN_LIST.value = Math.random();
-};
-export const useRefreshPlanList = (callback: WatchCallback) => {
-  watch(REFRESH_PLAN_LIST, callback);
 };

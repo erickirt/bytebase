@@ -2,6 +2,8 @@ package v1
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"slices"
 
@@ -17,6 +19,7 @@ import (
 	"github.com/bytebase/bytebase/backend/component/sheet"
 	"github.com/bytebase/bytebase/backend/runner/schemasync"
 	"github.com/bytebase/bytebase/backend/store"
+	"github.com/bytebase/bytebase/backend/store/model"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
 )
@@ -65,30 +68,29 @@ func (s *ReleaseService) CreateRelease(ctx context.Context, request *v1pb.Create
 		return nil, status.Errorf(codes.NotFound, "project %v not found", projectID)
 	}
 
-	request.Release.Files, err = validateAndSanitizeReleaseFiles(request.Release.Files)
+	request.Release.Files, err = validateAndSanitizeReleaseFiles(ctx, s.store, request.Release.Files)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid release files, err: %v", err)
 	}
 	sheetsToCreate := []*store.SheetMessage{}
-	fileToSheetMap := map[*v1pb.Release_File]*store.SheetMessage{}
+	var filesWithoutSheet []*v1pb.Release_File
 	// Prepare sheets to create for files with missing sheets.
+	// Check versions.
 	for _, file := range request.Release.Files {
 		if file.Sheet == "" {
-			if file.Statement == nil {
-				return nil, status.Errorf(codes.InvalidArgument, "either sheet or statement must be set")
-			}
+			// statement must be present due to validation in validateAndSanitizeReleaseFiles
 			sheet := &store.SheetMessage{
 				Title:     fmt.Sprintf("File %s", file.Path),
 				Statement: string(file.Statement),
 			}
 			sheetsToCreate = append(sheetsToCreate, sheet)
-			fileToSheetMap[file] = sheet
+			filesWithoutSheet = append(filesWithoutSheet, file)
 		}
 	}
 
 	// Batch create sheets if needed.
 	if len(sheetsToCreate) > 0 {
-		createdSheets, err := s.sheetManager.BatchCreateSheet(ctx, sheetsToCreate, project.ResourceID, user.ID)
+		createdSheets, err := s.sheetManager.BatchCreateSheets(ctx, sheetsToCreate, project.ResourceID, user.ID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create sheets, err: %v", err)
 		}
@@ -98,13 +100,7 @@ func (s *ReleaseService) CreateRelease(ctx context.Context, request *v1pb.Create
 
 		// Map created sheets back to files.
 		for i, sheet := range createdSheets {
-			file := sheetsToCreate[i]
-			for f, s := range fileToSheetMap {
-				if s == file {
-					f.Sheet = common.FormatSheet(project.ResourceID, sheet.UID)
-					break
-				}
-			}
+			filesWithoutSheet[i].Sheet = common.FormatSheet(project.ResourceID, sheet.UID)
 		}
 	}
 
@@ -417,19 +413,53 @@ func convertReleaseVcsSource(vs *v1pb.Release_VCSSource) *storepb.ReleasePayload
 	}
 }
 
-func validateAndSanitizeReleaseFiles(files []*v1pb.Release_File) ([]*v1pb.Release_File, error) {
+// validateAndSanitizeReleaseFiles validates and sanitizes the release files inputs.
+// It ensures that each file has either a sheet or a statement, and that the sheet is valid.
+// It also checks for duplicate versions and sorts the files by version.
+// If a sheet is provided, it populates the statement from the sheet.
+// If a statement is provided, it computes the sheetSha256 from the statement.
+// It returns an error if any validation fails.
+// The function also generates a unique ID for each file.
+// The files are sorted by version in ascending order.
+func validateAndSanitizeReleaseFiles(ctx context.Context, s *store.Store, files []*v1pb.Release_File) ([]*v1pb.Release_File, error) {
 	versionSet := map[string]struct{}{}
 
 	for _, f := range files {
 		f.Id = uuid.NewString()
 
-		if f.Version == "" {
-			return nil, errors.Errorf("file version cannot be empty")
+		switch {
+		// Validate that either sheet or statement is provided
+		case f.Sheet == "" && len(f.Statement) == 0:
+			return nil, errors.Errorf("either sheet or statement must be set for file %q", f.Path)
+		case f.Sheet != "" && len(f.Statement) > 0:
+			return nil, errors.Errorf("cannot set both sheet and statement for file %q", f.Path)
+
+		// If sheet is provided but statement is not, populate statement from sheet
+		case f.Sheet != "":
+			_, sheetUID, err := common.GetProjectResourceIDSheetUID(f.Sheet)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get sheet UID from %q", f.Sheet)
+			}
+			sheet, err := s.GetSheet(ctx, &store.FindSheetMessage{
+				UID:      &sheetUID,
+				LoadFull: true,
+			})
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get sheet %q", f.Sheet)
+			}
+			if sheet == nil {
+				return nil, errors.Errorf("sheet %q not found", f.Sheet)
+			}
+			f.Statement = []byte(sheet.Statement)
+			f.SheetSha256 = sheet.GetSha256Hex()
+		case len(f.Statement) > 0:
+			// populate sheetSha256 from statement
+			h := sha256.Sum256(f.Statement)
+			f.SheetSha256 = hex.EncodeToString(h[:])
 		}
+
 		switch f.Type {
 		case v1pb.ReleaseFileType_VERSIONED:
-		case v1pb.ReleaseFileType_TYPE_UNSPECIFIED:
-			return nil, errors.Errorf("unexpected file type %q", f.Type.String())
 		default:
 			return nil, errors.Errorf("unexpected file type %q", f.Type.String())
 		}
@@ -440,15 +470,34 @@ func validateAndSanitizeReleaseFiles(files []*v1pb.Release_File) ([]*v1pb.Releas
 		versionSet[f.Version] = struct{}{}
 	}
 
-	slices.SortFunc(files, func(a, b *v1pb.Release_File) int {
-		if a.Version < b.Version {
+	// Create files with additional parsed version data for sorting.
+	type fileWithVersion struct {
+		file    *v1pb.Release_File
+		version *model.Version
+	}
+	var filesWithVersions []fileWithVersion
+	for _, f := range files {
+		version, err := model.NewVersion(f.Version)
+		if err != nil {
+			return nil, err
+		}
+		filesWithVersions = append(filesWithVersions, fileWithVersion{
+			file:    f,
+			version: version,
+		})
+	}
+	slices.SortFunc(filesWithVersions, func(a, b fileWithVersion) int {
+		if a.version.LessThan(b.version) {
 			return -1
 		}
-		if a.Version > b.Version {
-			return 1
-		}
-		return 0
+		return 1
 	})
 
-	return files, nil
+	return slices.Collect(func(yield func(*v1pb.Release_File) bool) {
+		for _, f := range filesWithVersions {
+			if !yield(f.file) {
+				return
+			}
+		}
+	}), nil
 }

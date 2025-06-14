@@ -1,11 +1,7 @@
 import { uniq } from "lodash-es";
 import { extractUserId, useGroupStore, useWorkspaceV1Store } from "@/store";
-import { roleNamePrefix, userNamePrefix } from "@/store/modules/v1/common";
-import {
-  PresetRoleType,
-  groupBindingPrefix,
-  ALL_USERS_USER_EMAIL,
-} from "@/types";
+import { userNamePrefix } from "@/store/modules/v1/common";
+import { groupBindingPrefix, ALL_USERS_USER_EMAIL } from "@/types";
 import type { IamPolicy, Binding } from "@/types/proto/v1/iam_policy";
 import { convertFromExpr } from "@/utils/issue/cel";
 
@@ -106,7 +102,7 @@ export const memberMapToRolesInProjectIAM = (
   return rolesMapByName;
 };
 
-export const roleListInIAM = ({
+export const bindingListInIAM = ({
   policy,
   email,
   ignoreGroup,
@@ -114,26 +110,14 @@ export const roleListInIAM = ({
   policy: IamPolicy;
   email: string;
   ignoreGroup: boolean;
-}) => {
-  const roles = policy.bindings
-    .filter((binding) => {
-      if (binding.role === PresetRoleType.WORKSPACE_MEMBER) {
-        return false;
-      }
-      if (isBindingPolicyExpired(binding)) {
-        return false;
-      }
-      const emailList = getUserEmailListInBinding({ binding, ignoreGroup });
-      return (
-        emailList.includes(ALL_USERS_USER_EMAIL) || emailList.includes(email)
-      );
-    })
-    .map((binding) => binding.role);
-
-  if (!roles.some((role) => role.startsWith(`${roleNamePrefix}workspace`))) {
-    // TODO(ed): no default workspace member role.
-    roles.push(PresetRoleType.WORKSPACE_MEMBER);
-  }
-
-  return roles;
+}): Binding[] => {
+  return policy.bindings.filter((binding) => {
+    if (isBindingPolicyExpired(binding)) {
+      return false;
+    }
+    const emailList = getUserEmailListInBinding({ binding, ignoreGroup });
+    return (
+      emailList.includes(ALL_USERS_USER_EMAIL) || emailList.includes(email)
+    );
+  });
 };

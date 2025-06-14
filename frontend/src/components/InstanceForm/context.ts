@@ -1,3 +1,9 @@
+import Emittery from "emittery";
+import { cloneDeep, isEqual, omit } from "lodash-es";
+import { useDialog } from "naive-ui";
+import type { InjectionKey, Ref } from "vue";
+import { computed, inject, provide, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { instanceServiceClient } from "@/grpcweb";
 import {
   environmentNamePrefix,
@@ -8,7 +14,6 @@ import {
 import {
   isValidEnvironmentName,
   unknownEnvironment,
-  type FeatureType,
 } from "@/types";
 import { Engine, State } from "@/types/proto/v1/common";
 import type { DataSource, Instance } from "@/types/proto/v1/instance_service";
@@ -19,18 +24,13 @@ import {
   DataSource_AuthenticationType,
   DataSource_RedisType,
 } from "@/types/proto/v1/instance_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import {
   extractInstanceResourceName,
   hasWorkspacePermissionV2,
   isValidSpannerHost,
 } from "@/utils";
 import { extractGrpcErrorMessage } from "@/utils/grpcweb";
-import Emittery from "emittery";
-import { cloneDeep, isEqual, omit } from "lodash-es";
-import { useDialog } from "naive-ui";
-import type { InjectionKey, Ref } from "vue";
-import { computed, inject, provide, ref } from "vue";
-import { useI18n } from "vue-i18n";
 import type { ResourceIdField } from "../v2";
 import type { EditDataSource } from "./common";
 import {
@@ -101,7 +101,7 @@ export const provideInstanceFormContext = (baseContext: {
 
   const hasReadonlyReplicaFeature = computed(() => {
     return useSubscriptionV1Store().hasInstanceFeature(
-      "bb.feature.read-replica-connection",
+      PlanFeature.FEATURE_INSTANCE_READ_ONLY_CONNECTION,
       instance.value
     );
   });
@@ -109,7 +109,7 @@ export const provideInstanceFormContext = (baseContext: {
   const resetDataSource = () => {
     dataSourceEditState.value = extractDataSourceEditState(instance.value);
   };
-  const missingFeature = ref<FeatureType | undefined>(undefined);
+  const missingFeature = ref<PlanFeature | undefined>(undefined);
 
   const resourceIdField = ref<InstanceType<typeof ResourceIdField>>();
 
@@ -204,7 +204,9 @@ export const provideInstanceFormContext = (baseContext: {
     if (!hasWorkspacePermissionV2("bb.instances.create")) {
       return false;
     }
-    if (!isValidEnvironmentName(`${environmentNamePrefix}${environment.value.id}`)) {
+    if (
+      !isValidEnvironmentName(`${environmentNamePrefix}${environment.value.id}`)
+    ) {
       return false;
     }
     if (basicInfo.value.engine === Engine.SPANNER) {
@@ -256,7 +258,6 @@ export const provideInstanceFormContext = (baseContext: {
         "updatedMasterPassword",
         "useEmptyMasterPassword",
         "updateSsl",
-        "updateSsh",
         "updateAuthenticationPrivateKey"
       )
     );

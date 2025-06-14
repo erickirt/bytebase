@@ -132,6 +132,7 @@
     "loading": "加载中",
     "copy": "拷贝",
     "copied": "已拷贝",
+    "click-to-copy": "点击复制",
     "manage": "管理",
     "table": "表",
     "search": "搜索",
@@ -150,6 +151,7 @@
     "view-doc": "查看文档",
     "write-only": "仅写入",
     "sync": "同步",
+    "succeed": "成功",
     "success": "成功",
     "failed": "失败",
     "load-more": "加载更多",
@@ -178,12 +180,17 @@
     "optional": "可选",
     "reason": "理由",
     "date": {
-      "days": "{days} 天"
+      "days": "{days} 天",
+      "week": "1 周",
+      "month": "1 个月",
+      "months": "{months} 个月",
+      "year": "1 年"
     },
+    "access-expires": "访问到期",
     "expiration": "过期时间",
     "configure": "配置",
     "groups": "分组",
-    "database-groups": "数据库分组",
+    "database-group": "数据库分组",
     "members": "成员",
     "warehouse": "仓库",
     "schedule": "计划",
@@ -224,10 +231,15 @@
     "catalog": "Catalog",
     "summary": "总结",
     "errors": "错误",
-    "removed": "已移除"
+    "removed": "已移除",
+    "submit": "提交"
   },
   "error-page": {
     "go-back-home": "回到主页"
+  },
+  "refresh-remind": {
+    "title": "检测到过时版本",
+    "description": "检测到过时版本。请刷新页面。"
   },
   "task": {
     "current-task": "当前任务",
@@ -246,9 +258,6 @@
       },
       "summary-report": "概要报告"
     },
-    "rollout-time": "指定发布时间",
-    "earliest-allowed-time-hint": "'@:{'task.rollout-time'}' 是您希望任务运行的时间；如果未指定，任务会在满足条件后立即执行。",
-    "earliest-allowed-time-unset": "未设置",
     "comment": "评论",
     "started": "开始于",
     "view-change": "查看变更",
@@ -270,47 +279,50 @@
     "action-all-tasks-in-current-stage": "{action}当前阶段的所有任务",
     "cancel-task": "取消任务",
     "created": "创建于",
+    "run-immediately": "立即运行任务",
+    "scheduled-time": "计划时间",
+    "select-scheduled-time": "选择计划时间",
+    "error": {
+      "scheduled-time-must-be-in-the-future": "计划时间必须是将来的时间"
+    },
     "online-migration": {
       "self": "在线大表变更",
       "configure-ghost-parameters": "配置 gh-ost 参数",
       "ghost-parameters": "gh-ost 参数",
       "configure": "配置",
       "error": {
-        "x-status-task-is-not-editable": "{status} 的任务不可编辑",
         "nothing-changed": "无任何改变",
         "not-applicable": {
-          "task-doesnt-meet-ghost-requirement": "任务不符合 gh-ost 的要求",
-          "needs-database-for-saving-temp-data": "需要数据库 {database} 来保存临时数据。"
+          "database-doesnt-meet-ghost-requirement": "数据库 {database} 不符合 gh-ost 的要求"
         }
       },
       "advice-split-statement-to-single-online-migration-issue": "建议将该语句拆分成单独的在线大表变更工单。"
     },
-    "prior-backup-tips": "提前备份受影响的数据"
+    "prior-backup-tips": "备份提前影响数据",
+    "database-create": {
+      "created": "已创建",
+      "pending": "待创建"
+    }
   },
   "task-run": {
     "status": {
       "enqueued": "等待执行。",
       "enqueued-with-rollout-time": "等待执行，{time}后执行。",
-      "waiting-connection": "等待可用的实例连接。实例连接数已达到 Bytebase 上设置的限制。",
-      "waiting-task": "等待另一个任务完成。"
+      "waiting-connection": "等待可用的实例连接。实例连接数已达到 Bytebase 上设置的限制。上次报告时间：{time}。",
+      "waiting-task": "等待另一个任务完成。上次报告时间：{time}。",
+      "waiting-max-tasks-per-rollout": "正在等待其他任务完成。已达到每次发布的最大运行任务数限制。上次报告时间：{time}。"
     }
   },
   "banner": {
     "license-expired": "您的{plan}证书已在 {expireAt} 过期",
     "license-expires": "您的{plan}证书将在 {days} 天后过期",
     "trial-expires": "您的{plan}试用将在 {days} 天后过期",
-    "trial-expired": "您的{plan}试用已过期",
     "deploy": "本地部署",
     "cloud": "云服务",
     "request-demo": "预约一个 30 分钟的产品演示。",
     "external-url": "Bytebase 还没有配置 --external-url"
   },
   "bbkit": {
-    "common": {
-      "cancel": "取消",
-      "back": "退回",
-      "next": "下一步"
-    },
     "confirm-button": {
       "sure-to-delete": "确定要删除吗？",
       "sure-to-archive": "确定要归档吗？",
@@ -336,8 +348,7 @@
       "data-classification": "数据分类",
       "data-access": "数据访问",
       "audit-log": "审计日志",
-      "custom-roles": "自定义角色",
-      "mail-delivery": "邮件发送"
+      "custom-roles": "自定义角色"
     },
     "profile": {
       "email": "邮箱",
@@ -353,6 +364,7 @@
     },
     "members": {
       "inactive": "未激活",
+      "inactive-users": "未激活用户",
       "table": {
         "account": "账户",
         "role": "角色",
@@ -387,7 +399,7 @@
       "reset-service-key": "重置 Service Key",
       "reset-service-key-alert": "旧 Service Key 将立即被重置，该操作不可逆。确定要重置 Service Key 吗？",
       "service-key-copied": "Service Key 已复制，请勿泄漏",
-      "show-inactive": "查看未激活的成员",
+      "show-inactive": "查看未激活的用户",
       "view-by-roles": "按角色查看",
       "add-member": "添加成员",
       "add-user": "添加用户",
@@ -401,11 +413,13 @@
         "reset-token": "重置密钥",
         "reset-token-warning": "您需要更新 Entra 应用程序配置。"
       },
+      "all-users": "全部用户",
       "search-member": "搜索成员",
       "revoked": "已撤销",
       "view-by-members": "按成员查看",
       "revoke-access": "撤销访问权限",
       "revoke-access-alert": "您确定要撤销访问权限吗？",
+      "revoke-allusers-alert": "撤销“@:{'settings.members.all-users'}”将撤销您工作区中所有其他用户的相关角色。您确定要继续吗？",
       "grant-access": "授予访问权限",
       "select-user": "选择用户 | 选择用户",
       "select-group": "选择组 | 选择组",
@@ -422,26 +436,25 @@
       "delete": "删除该 SSO",
       "form": {
         "type": "类型",
-        "learn-more-with-user-doc": "了解更多如何配置",
+        "type-description": "选择要配置的身份提供者类型",
+        "oauth2-description": "适用于 OAuth 2.0 提供商，例如 Google、GitHub、GitLab 以及自部署等。",
+        "oidc-description": "适用于 OpenID Connect 提供商，例如 Microsoft Entra ID (Azure AD)、Okta、Auth0",
+        "ldap-description": "适用于 LDAP 提供商，例如 Microsoft Active Directory、OpenLDAP",
         "redirect-url": "回调地址",
         "redirect-url-description": "将会用于填写到身份提供商申请表单中的相应字段。",
         "use-template": "使用模版",
-        "basic-information": "基础信息",
+        "template-description": "选择预配置的模板或自定义 OAuth 2.0 提供商。",
         "name": "名称",
         "name-description": "显示给登录用户的名称",
         "resource-id": "资源 ID",
         "domain": "域名",
         "domain-description": "OAuth 提供商的域名",
-        "identity-provider-information": "身份提供商信息",
-        "identity-provider-information-description": "这些信息是由您的身份提供商提供的。",
         "identity-provider-needed-information": "用以下信息创建您的 SSO 应用程序。",
         "auth-url-description": "登录页面的链接",
         "scopes-description": "访问 Auth URL 时携带的范围参数，使用空格分隔多个值",
         "token-url-description": "用于获取 accessToken 的 API 地址",
         "user-info-url-description": "用于通过 accessToken 获取用户信息的 API 地址",
         "security-protocol": "安全协议",
-        "connection-security": "安全性选项",
-        "connection-security-skip-tls-verify": "跳过证书验证",
         "user-information-mapping": "用户信息映射",
         "user-information-mapping-description": "字段映射保存了来自 API 用户信息的字段名。",
         "identifier": "Bytebase 用户的邮箱",
@@ -449,15 +462,59 @@
         "display-name": "Bytebase 用户的昵称",
         "phone": "Bytebase 用户的手机号",
         "groups": "Bytebase 用户的群组",
-        "auth-style": {
-          "self": "认证参数传递方式",
-          "in-params": {
-            "self": "通过请求参数"
-          },
-          "in-header": {
-            "self": "通过请求头"
-          }
-        }
+        "general-setting-description": "提供有关您的身份提供者的基本信息。",
+        "configuration": "配置",
+        "configuration-description": "配置身份提供商的连接设置",
+        "auth-url": "授权网址",
+        "auth-url-placeholder": "例如 https://github.com/login/oauth/authorize",
+        "token-url": "令牌 URL",
+        "token-url-placeholder": "例如 https://github.com/login/oauth/access_token",
+        "user-info-url": "用户信息 URL",
+        "user-info-url-placeholder": "例如 https://api.github.com/user",
+        "scopes": "作用域",
+        "scopes-placeholder": "例如用户电子邮件资料",
+        "scopes-placeholder-oidc": "例如 openid 个人资料电子邮件",
+        "authentication-style": "身份验证方式",
+        "in-parameters": "在参数中",
+        "in-parameters-description": "在 POST 正文中发送凭据（推荐）",
+        "in-header": "在标题中",
+        "in-header-description": "使用 HTTP 基本授权发送凭证",
+        "security-options": "安全选项",
+        "skip-tls-verification": "跳过 TLS 证书验证",
+        "skip-tls-warning": "仅为开发或测试目的启用此功能",
+        "issuer-url-placeholder": "例如 https://acme.okta.com",
+        "issuer-url-description": "OIDC Issuer URL",
+        "openid-scopes-description": "以空格分隔的 OIDC 范围列表（需要 openid）",
+        "host-placeholder": "例如 ldap.example.com",
+        "bind-dn": "绑定 DN",
+        "bind-dn-placeholder": "例如uid=系统、ou=用户、dc=示例、dc=com",
+        "bind-dn-description": "搜索请求时绑定的用户 DN",
+        "bind-password": "绑定密码",
+        "base-dn": "基本 DN",
+        "base-dn-placeholder": "例如ou=用户、dc=示例、dc=com",
+        "base-dn-description": "搜索用户的基本 DN",
+        "user-filter": "用户过滤器",
+        "user-filter-placeholder": "例如 (uid=%s)",
+        "user-filter-description": "搜索用户的过滤器（%s 将被替换为用户名）",
+        "starttls": "启动 TLS",
+        "starttls-description": "将连接升级到 TLS（推荐）",
+        "ldaps": "LDAPS",
+        "ldaps-description": "从一开始就使用 TLS（端口 636）",
+        "none": "没有任何",
+        "none-description": "无加密（不建议用于生产）",
+        "resource-id-readonly-hint": "资源 ID 创建后无法更改",
+        "domain-optional-hint": "可选：限制此域用户的访问",
+        "provider-type-readonly-hint": "提供商类型创建后无法更改",
+        "identifier-placeholder": "例如登录名、电子邮件",
+        "display-name-placeholder": "例如名称、显示名称",
+        "phone-placeholder": "例如电话、手机",
+        "groups-placeholder": "例如团体",
+        "groups-description": "用于基于组的访问控制（仅限 OIDC 提供商）",
+        "google-template-description": "使用 Google 帐户登录",
+        "github-template-description": "使用 GitHub 帐户登录",
+        "gitlab-template-description": "使用 GitLab 帐户登录",
+        "microsoft-entra-template-description": "使用 Microsoft Entra ID 登录",
+        "custom-template-description": "配置自定义 OAuth 2.0 提供程序"
       },
       "copy-redirect-url": "Redirect URL 已复制到剪切板。"
     },
@@ -508,7 +565,7 @@
         },
         "maximum-role-expiration": {
           "self": "角色最大过期时间",
-          "description": "角色最大过期时间是可以赋予用户角色时所能设置的最大过期时间。(包括数据查询者和导出者)",
+          "description": "角色最大过期时间是可以赋予用户角色时所能设置的最大过期时间，会应用在项目所有者之外的其他项目角色上。",
           "days": "天数",
           "never-expires": "永不过期"
         },
@@ -693,27 +750,19 @@
       },
       "json-format-example": "JSON 格式样例",
       "view-example": "查看样例"
-    },
+    }
+  },
+  "remind": {
     "release": {
       "new-version-available": "有新版本可更新",
       "new-version-available-with-tag": "新版本 {tag} 已推出",
       "new-version-content": "新版本 {tag} 正式发布！请根据我们的文档来获取新版本。"
     },
-    "mail-delivery": {
-      "description": "配置邮件信息可以让用户接收到数据库相关报告的电子邮件，如慢查询周报。",
-      "field": {
-        "smtp-server-host": "SMTP 服务器主机",
-        "smtp-server-port": "SMTP 服务器端口",
-        "from": "发件人地址",
-        "smtp-username": "SMTP 用户名",
-        "smtp-password": "SMTP 密码",
-        "send-test-email-to": "收件人测试地址",
-        "send": "发送",
-        "authentication-method": "验证方式",
-        "encryption": "加密方式"
-      },
-      "updated-tip": "邮件传输配置更新成功",
-      "tested-tip": "发送成功，请检查 {address} 的收件箱。"
+    "role-expire": {
+      "title": "角色到期提醒",
+      "content": "您的角色即将到期",
+      "checkbox": "直到有更新再提醒",
+      "go-to-project": "前往项目页面"
     }
   },
   "activity": {
@@ -868,12 +917,6 @@
       "closed": "关闭",
       "close": "关闭"
     },
-    "sdl": {
-      "schema-change": "Schema 变化",
-      "generated-ddl-statements": "生成的 DDL 语句",
-      "full-schema": "完整 schema",
-      "left-schema-may-change": "左边的 schema 在工单执行前可能会发生变化。"
-    },
     "approval-flow": {
       "self": "审批流",
       "tooltip": "审批人需要按审批流指定的顺序审核和审批工单。只有审批流中所有步骤都完成审批后工单才可以执行。您可以为每个风险级别自定义审批。",
@@ -890,11 +933,13 @@
     "issue-name": "工单名称",
     "grant-request": {
       "export-rows": "最大导出行数",
+      "select-export-rows": "选择最大导出行数",
       "expired-at": "过期时间",
       "all-databases": "所有数据库",
       "all-databases-tip": "所有当前和未来属于这个项目的数据库。",
       "manually-select": "手动选择",
-      "custom": "自定义"
+      "custom-date": "自定义日期",
+      "custom-date-placeholder": "选择到期日期和时间"
     },
     "review-sent-back": "审核被退回",
     "update-statement": {
@@ -905,18 +950,9 @@
         "selected-stage": "选中的阶段",
         "all-tasks": "所有任务"
       },
-      "current-change-will-apply-to-all-tasks-in-batch-mode": "在批量模式下，当前更改将应用​​于所有任务。",
-      "current-change-will-apply-to-all-tasks": "当前更改将应用​​于所有任务。"
+      "current-change-will-apply-to-all-tasks-in-batch-mode": "在批量模式下，当前更改将应用​​于所有任务。"
     },
-    "not-editable-legacy-issue": "这个工单不可编辑，因为它是在旧版本的 Bytebase 中创建的。",
     "action-anyway": "仍要{action}",
-    "disallow-edit-reasons": {
-      "issue-is-done": "工单已完成",
-      "issue-is-canceled": "工单已取消",
-      "task-is-x-status": "任务状态是{status}",
-      "task-is-running-cancel-first": "任务运行中，需要取消任务才能修改这项值"
-    },
-    "you-are-not-allowed-to-change-this-value": "您无权更改这项值",
     "sql-check": {
       "sql-checks": "SQL 检查项",
       "not-executed-yet": "尚未执行",
@@ -931,7 +967,7 @@
       "you-are-not-allowed-to-perform-this-action": "您无权执行此操作",
       "cannot-close-issue-with-running-tasks": "无法关闭还存在运行中任务的工单"
     },
-    "unfinished-resolved-issue-tips": "该工单被标记为「已完成」，但其中某些任务并未成功执行。",
+    "unfinished-resolved-issue-tips": "该工单被标记为「已完成」，但其中部分任务并未成功执行。",
     "some-tasks-are-not-executed-successfully": "（部分任务并未成功执行）",
     "missing-sql-statement": "SQL 语句缺失。",
     "task-summary-tooltip": "{failed} 个任务失败",
@@ -940,9 +976,6 @@
       "format": "导出格式",
       "encrypt": "加密",
       "file-downloaded": "文件已下载"
-    },
-    "update-rollout-time": {
-      "self": "修改指定发布时间"
     },
     "task-run": {
       "logs": "日志",
@@ -978,19 +1011,90 @@
       }
     },
     "sql-review-only": "仅 SQL 审核",
-    "create-issue": "创建变更工单",
-    "this-plan-will-be-converted-to-a-new-issue": "该计划将转换为一个变更工单",
+    "create-issue": "创建工单",
+    "this-plan-will-be-converted-to-a-new-issue": "该变更计划将转换为一个工单",
     "title": {
       "edit-schema": "变更 Schema",
       "change-data": "变更数据",
       "export-data": "导出数据",
       "create-database": "创建数据库",
-      "request-querier-role": "申请查询者角色",
-      "request-exporter-role": "申请导出者角色"
+      "request-role": "请求角色",
+      "request-specific-role": "请求“{role}”角色"
     },
     "schema-drift-detected": {
       "self": "检测到 Schema 偏差",
       "description": "所选数据库存在 Schema 偏差，请在变更前确保该偏差符合预期。"
+    }
+  },
+  "plan": {
+    "new-plan": "新计划",
+    "add-spec": "添加变更项",
+    "change-type": "变更类型",
+    "schema-migration": "Schema 变更",
+    "schema-migration-description": "修改数据库 Schema (DDL)",
+    "data-change": "数据变更",
+    "data-change-description": "修改数据（DML）",
+    "select-targets": "选择变更对象",
+    "overview": {
+      "description": "查看和管理此变更计划中的所有变更项",
+      "total-specs": "变更项",
+      "total-targets": "变更对象",
+      "check-status": "检查状态",
+      "no-checks": "没有检查",
+      "affected-resources": "受影响的资源"
+    },
+    "navigator": {
+      "specifications": "变更项",
+      "checks": "检查",
+      "statement-empty": "变更语句为空"
+    },
+    "spec": {
+      "type": {
+        "create-database": "创建数据库",
+        "schema-change": "Schema 变更",
+        "data-change": "数据变更",
+        "ghost-migration": "在线大表变更",
+        "database-change": "数据库变更",
+        "export-data": "导出数据",
+        "unknown": "未知"
+      }
+    },
+    "targets": {
+      "title": "变更对象",
+      "no-targets-found": "未找到变更对象",
+      "one-database": "1 个数据库",
+      "multiple-databases": "{count} 个数据库",
+      "database-group": "数据库组",
+      "database-not-found": "未找到数据库",
+      "type": {
+        "instance": "实例",
+        "database": "数据库",
+        "database-group": "数据库组"
+      },
+      "view-all": "查看全部 ({count})"
+    },
+    "options": {
+      "self": "配置项",
+      "applies-to-all-tasks": "适用于所有任务",
+      "applies-to-some-tasks": "适用于部分任务 {count}/{total}",
+      "split-into-multiple-issues-tip": "如果您想为每个任务设置不同的配置项，请拆分成多个工单。"
+    },
+    "pre-backup": {
+      "only-some-databases-checked": "仅检查部分数据库",
+      "some-databases-not-meeting-requirements": "部分数据库（{databases}）不符合要求",
+      "some-databases-have-issues": "{count} 个数据库有问题 | {count} 个数据库有问题",
+      "configuration-has-issues": "配置存在 {count} 个问题 | 配置存在 {count} 个问题"
+    },
+    "ghost": {
+      "only-some-databases-checked": "仅检查部分数据库",
+      "some-databases-not-meeting-requirements": "部分数据库（{databases}）不符合要求",
+      "some-databases-have-issues": "{count} 个数据库有问题 | {count} 个数据库有问题",
+      "configuration-has-issues": "配置存在 {count} 个问题 | 配置存在 {count} 个问题"
+    },
+    "checks": {
+      "self": "检查",
+      "no-checks": "没有可用的检查结果",
+      "click-to-run-checks": "单击“运行检查”以验证此规范"
     }
   },
   "quick-action": {
@@ -1072,7 +1176,8 @@
     },
     "selected-n-instances": "已选择 {n} 个实例",
     "users": "用户",
-    "successfully-archived-instance-updatedinstance-name": "成功归档实例'{0}'。",
+    "successfully-restored-instance": "已成功恢复实例“{0}”。",
+    "successfully-archived-instance": "成功归档实例'{0}'。",
     "successfully-synced-schema-for-instance-instance-value-name": "成功为实例'{0}'同步 schema 。",
     "archive-this-instance": "归档该实例",
     "archive-instance-instance-name": "归档实例'{0}'?",
@@ -1263,9 +1368,9 @@
       "title": "访问控制",
       "disable-copy-data-from-sql-editor": "限制 SQL 编辑器中的数据复制 (管理员/DBA 可以复制)",
       "restrict-admin-connection": {
-        "self": "管理员连接查询限制",
-        "disallow": "禁止用管理员连接查询数据",
-        "fallback": "如果没有只读连接可用，则回退到管理员连接"
+        "self": "限制查询主数据源",
+        "disallow": "不允许从主数据源查询数据",
+        "fallback": "如果没有可用的只读连接，则允许查询主数据源"
       }
     },
     "statement-execution": {
@@ -1328,7 +1433,7 @@
     "rollout": {
       "name": "发布策略",
       "tip": "新策略对旧工单也生效",
-      "info": "拥有 “taskRuns.create” 权限或以下角色的用户可以发布",
+      "info": "拥有 “{permission}” 权限或以下角色的用户可以发布",
       "auto": "自动发布",
       "auto-info": "如果预检查都通过的话，会自动发布，执行变更。",
       "last-issue-approver": "自定义审批的最后一个审批人"
@@ -1372,7 +1477,7 @@
     "edit-labels": "编辑标签",
     "edit-environment": "编辑环境",
     "mixed-values-for-label": "该标签拥有不同的值",
-    "mixed-label-values-warning": "某些标签拥有不同的值，编辑标签将会批量应用",
+    "mixed-label-values-warning": "部分标签拥有不同的值，编辑标签将会批量应用",
     "change-data": "变更数据",
     "table-detail": "表详情",
     "batch-action-not-support-alter-schema": "一些数据库不支持修改表结构",
@@ -1383,7 +1488,6 @@
     "successfully-transferred-databases": "数据库转移完成",
     "nullable": "可为空",
     "expression": "表达式",
-    "position": "位置",
     "unique": "Unique",
     "visible": "Visible",
     "comment": "注释",
@@ -1400,7 +1504,6 @@
     "unassigned-databases": "未分配的数据库",
     "selected-n-databases": "已选择 {n} 个数据库",
     "n-databases": "{n} 个数据库",
-    "select-databases-from-same-project": "请选择同一个项目下的数据库",
     "sync-schema": {
       "title": "库表同步",
       "description": "Bytebase 支持将一个指定的 Schema 同步到一个或多个目标数据库。（支持 MySQL, PostgreSQL, Oracle, MSSQL 以及 TiDB）",
@@ -1484,7 +1587,9 @@
     "foreign-key": {
       "reference": "引用"
     },
-    "create-target-database-or-schema-for-backup": "请先创建备份的目标数据库或 Schema",
+    "checks": "Check 约束",
+    "backup-unavailable-for-databases": "数据库无法开启备份：{databases}",
+    "engine-not-supported-for-backup": "引擎不支持预备份：{databases}",
     "revision": {
       "self": "版本",
       "applied-at": "应用时间",
@@ -1644,6 +1749,10 @@
         "ci-sampling-size": {
           "self": "CI 数据采样大小",
           "description": "在CI数据验证期间，要采样的数据库数量的最大数量。\n禁用（零）时，将执行完整验证。"
+        },
+        "parallel_tasks_per_rollout": {
+          "self": "每个发布的并行任务数",
+          "description": "控制每个发布的并行任务数量。\n将其设置为零，可以禁用任何节流。"
         }
       }
     },
@@ -1654,7 +1763,6 @@
       "view-by-roles": "按角色查看",
       "cannot-remove-last-owner": "无法移除项目的最后一个所有者",
       "revoke-role-from-user": "删除'{user}'{role}的角色",
-      "assign-reason": "（可选）理由",
       "never-expires": "永不过期",
       "role-description": "角色描述",
       "role-never-expires": "此角色没有过期时间。",
@@ -1683,7 +1791,6 @@
       "client-cert": "客户端证书"
     },
     "ssh-type": {
-      "tunnel": "@:{'data-source.ssh.tunnel'}",
       "tunnel-and-private-key": "@:{'data-source.ssh.tunnel'} + @:{'data-source.ssh.private-key'}",
       "none": "不使用"
     },
@@ -1719,7 +1826,6 @@
   "sql-editor": {
     "self": "SQL 编辑器",
     "select-connection": "请选择数据连接",
-    "search-databases": "搜索数据库",
     "search-results": "搜索结果",
     "loading-databases": "加载数据库信息...",
     "show-databases-without-query-permission": "显示没有查询权限的数据库",
@@ -1733,6 +1839,10 @@
     "to-enable-admin-mode": "来开启管理员模式",
     "notify-empty-statement": "请在编辑器中输入 SQL 语句",
     "can-not-execute-query": "加载数据时无法执行查询",
+    "invalid-database": "数据库 {database} 无效",
+    "request-cancelled": "请求已取消",
+    "request-aborted": "用户中止了请求",
+    "no-data-source": "没有可查询的数据源。请检查环境或项目的数据源查询策略。",
     "rows": "条记录",
     "vertical-display": "竖向展示",
     "no-history-found": "暂无历史记录",
@@ -1797,10 +1907,24 @@
     },
     "batch-query": {
       "batch": "批量",
-      "select-database": "选择下面的数据库",
-      "description": "批量查询 {project} 下的 {count} 个数据库。",
-      "show-or-hide-empty-query-results": "显示/隐藏空查询结果"
+      "select-database-group": "您可以{select-database-group}进行批量查询",
+      "description": "批量查询 {project} 下的 {database} 个数据库和 {group} 个数据库组。",
+      "show-or-hide-empty-query-results": "显示/隐藏空查询结果",
+      "select-data-source": {
+        "self": "选择批量查询使用的数据源",
+        "tooltip": "将先根据限制策略寻找数据源，然后应用该选择。",
+        "admin": "主数据源",
+        "readonly": "只读数据源",
+        "not-match": "数据源不匹配，预期为 {expect}，但实际使用 {actual}。"
+      }
     },
+    "batch-export": {
+      "self": "批量导出",
+      "tooltip": "最多选择 {max} 个数据库，批量导出最后一次执行的查询结果",
+      "failed-for-db": "无法导出 {db} 的数据"
+    },
+    "execute-query": "执行查询",
+    "pending-query": "待处理查询",
     "executing-query": "执行查询",
     "request-query": "请求查询",
     "copy-success": "复制成功",
@@ -1838,8 +1962,8 @@
       }
     },
     "query-context": {
-      "admin-data-source-is-disallowed-to-query": "禁止查询管理员数据源。",
-      "admin-data-source-is-disallowed-to-query-when-read-only-data-source-is-available": "当只读数据源可用时，不允许查询管理员数据源。"
+      "admin-data-source-is-disallowed-to-query": "禁止查询主数据源。",
+      "admin-data-source-is-disallowed-to-query-when-read-only-data-source-is-available": "当只读数据源可用时，不允许查询主数据源。"
     },
     "manage-connections": "管理连接",
     "view-detail": "查看详情",
@@ -1853,6 +1977,7 @@
     },
     "upload-file": "上传文件",
     "copy-selected-results": "通过 {action} 或 {button} 来快速复制选定的数据",
+    "cancel-selection": "取消选择",
     "format-default": "默认",
     "column-display-format": "列显示格式",
     "next-row": "下一行",
@@ -1978,25 +2103,30 @@
     "button": {
       "upgrade": "升级"
     },
-    "trial-start-modal": {
-      "title": "已开启{plan}试用",
-      "content": "您的{plan}试用已开启！在 {date} 之前所有{plan}功能将不受限制。",
-      "button": "了解",
-      "subscription-page": "订阅页面",
-      "subscription": "可以在{page}查看我们的订阅方案及付费功能。"
-    },
     "description": "您可以在这里上传您购买的 Bytebase 证书来解锁专业版/企业版功能。",
     "upload-license": "上传证书",
-    "upgrade-trial-button": "升级试用",
     "request-n-days-trial": "申请 {days} 天试用 (无需信用卡)",
     "request-with-qr": "扫描二维码申请试用",
     "require-subscription": "这个功能需要{requiredPlan}订阅，请购买 Bytebase 证书来解锁该功能。",
     "required-plan-with-trial": "这个功能需要{requiredPlan}订阅，{startTrial}",
     "trial-for-plan": "您可以开启{plan}的 {days} 天免费试用 - 无需任何信用卡或预付费。",
     "trial-for-days": "您可以开启 {days} 天的免费试用 - 无需任何信用卡或预付费。",
-    "upgrade-trial": "您可以直接将现有的试用升级到这个版本。",
     "contact-to-upgrade": "请联系工作空间所有者来升级到试用版。",
     "upgrade-now": "现在升级",
+    "usage": {
+      "instance-count": {
+        "title": "实例数量限制",
+        "remaining": "当前总实例额度为 {total}，目前仅剩 {count} 个份额可用。",
+        "runoutof": "已用尽全部 {total} 个实例额度。",
+        "upgrade": "@:{'subscription.upgrade'}来获取更多实例额度。"
+      },
+      "user-count": {
+        "title": "用户数量限制",
+        "remaining": "当前总用户额度为 {total}，目前仅剩 {count} 个份额可用。",
+        "runoutof": "已用尽全部 {total} 个用户额度。",
+        "upgrade": "@:{'subscription.upgrade'}来获取无限的用户额度。"
+      }
+    },
     "instance-assignment": {
       "license": "证书",
       "assign-license": "分配证书",
@@ -2006,8 +2136,7 @@
       "manage-license": "管理证书",
       "used-and-total-license": "已分配 / 总实例证书",
       "used-and-total-user": "活跃/总用户限制",
-      "success-notification": "证书分配更新成功",
-      "missing-license-for-feature": "缺少实例证书以启用{feature}。点击去分配证书。"
+      "success-notification": "证书分配更新成功"
     },
     "update": {
       "success": {
@@ -2023,6 +2152,28 @@
     "overuse-warning": "{neededPlan}在{currentPlan}将会受限，请尽快升级以确保正常使用。",
     "overuse-modal": {
       "description": "您正在使用当前「{plan}」不包含的功能。立即升级避免影响使用。"
+    },
+    "disabled-feature": "禁用功能",
+    "upgrade": "升级",
+    "contact-us": "联系我们",
+    "current": "当前",
+    "expired": "已过期",
+    "expires-at": "过期时间",
+    "plan-compare": "比较方案",
+    "trialing": "试用中",
+    "unlimited": "无限制",
+    "max-instance-count": "最大实例数量",
+    "plan": {
+      "free": {
+        "title": "免费版"
+      },
+      "team": {
+        "title": "团队版"
+      },
+      "enterprise": {
+        "title": "企业版"
+      },
+      "try": "免费试用。"
     }
   },
   "sheet": {
@@ -2063,7 +2214,6 @@
     "delete": "删除审核策略",
     "input-then-press-enter": "输入后按下回车来添加",
     "not-available-for-free": "{plan}订阅不能使用该规则",
-    "unlock-full-feature": "解锁 100+ SQL Review 规则",
     "search-by-name": "按名称搜索",
     "attach-resource": {
       "no-linked-resources": "没有绑定的资源",
@@ -2097,7 +2247,16 @@
     "enabled-rules": "开启的规则数",
     "rule-detail": "规则详情",
     "view-definition": "查看定义",
-    "all-checks-passed": "所有检查都通过了。"
+    "all-checks-passed": "所有检查都通过了",
+    "category": {
+      "builtin": "内置"
+    },
+    "level": {
+      "name": "级别",
+      "error": "错误",
+      "warning": "警告",
+      "disabled": "已禁用"
+    }
   },
   "audit-log": {
     "export-finished": "导出完成",
@@ -2134,19 +2293,18 @@
     "fit-content-with-view": "自动适应视图"
   },
   "identity-provider": {
-    "test-connection": "测试连接"
+    "test-connection": "测试连接",
+    "identity-provider-created": "身份提供者创建成功",
+    "identity-provider-deleted": "身份提供者已成功删除",
+    "identity-provider-update-failed": "无法更新身份提供者",
+    "identity-provider-create-failed": "无法创建身份提供者",
+    "identity-provider-delete-failed": "无法删除身份提供者",
+    "identity-provider-permission-denied": "没有权限"
   },
   "sensitive-data": {
     "self": "敏感数据"
   },
   "resource": {
-    "environment": "环境",
-    "instance": "实例",
-    "project": "项目",
-    "idp": "身份提供商",
-    "database-group": "数据库分组",
-    "changelist": "变更列表",
-    "review-config": "审查配置",
     "delete-warning": "“{name}”将被删除。此操作无法撤消。",
     "delete-warning-with-resources": "以下资源使用了“{name}”：",
     "delete-warning-retry": "请将其从这些资源中删除，然后重试。"
@@ -2159,7 +2317,8 @@
       "duplicated": "{resource} ID 已存在。请使用其他 ID。",
       "pattern": "{resource} ID 可以具有小写字母，数字或连字符。\n它必须从小写字母开始，并以字母或数字结尾。",
       "minlength": "{resource} ID 至少包含 1 个字符。",
-      "overflow": "{resource} ID 应该少于 64 个字符。"
+      "overflow": "{resource} ID 应该少于 64 个字符。",
+      "empty": "{resource} ID 不能为空"
     }
   },
   "multi-factor": {
@@ -2278,8 +2437,7 @@
           "ddl": "DDL",
           "create_database": "创建数据库",
           "data_export": "导出数据",
-          "request_query": "申请查询权限",
-          "request_export": "申请导出权限"
+          "request-role": "请求角色"
         }
       },
       "template": {
@@ -2403,7 +2561,6 @@
       "title-placeholder": "输入角色称谓",
       "description-placeholder": "输入角色描述"
     },
-    "default-workspace-role": "用户将默认获得“工作区成员”角色",
     "title": "称谓",
     "select-role": "选择角色",
     "expired-tip": "该角色可能已经过期。",
@@ -2465,7 +2622,7 @@
     "condition": {
       "self": "条件"
     },
-    "select": "选择数据库组",
+    "select": "选择数据库分组",
     "no-matched-databases": "没有匹配的数据库"
   },
   "export-center": {
@@ -2473,8 +2630,7 @@
     "permission-denied": "您没有权限执行此操作"
   },
   "review-center": {
-    "self": "SQL 审核中心",
-    "review-sql": "审核 SQL"
+    "self": "SQL 审核中心"
   },
   "schema-designer": {
     "use-tips": "选择需要设计的表"
@@ -2541,18 +2697,30 @@
     "change-type": "更改类型"
   },
   "release": {
+    "title": "发布包",
     "releases": "发布包",
     "files": "文件",
     "create": "创建发布",
     "select": "选择发布",
-    "tasks-to-apply": "待应用的任务",
-    "out-of-order-files": "无序文件",
-    "applied-but-modifed-files": "已应用但已修改的文件",
-    "allow-out-of-order": "允许无序文件",
     "archive-this-release": "归档此发布",
     "total-files": "共 {count} 个文件",
-    "no-tasks-to-apply": {
-      "self": "没有可应用的任务"
+    "plan-tip": "此变更计划已配置为使用发布包。数据库变更将使用所选发布包文件中的 SQL 语句执行。",
+    "not-found": "未找到",
+    "vcs-source": "VCS 源",
+    "view-all-files": "查看全部文件",
+    "and-n-more-files": "还有 {count} 个文件",
+    "change-type": {
+      "ddl": "DDL",
+      "ddl-ghost": "DDL Ghost",
+      "dml": "DML",
+      "unspecified": "未指定"
+    },
+    "file-type": {
+      "versioned": "版本化",
+      "unspecified": "未指定"
+    },
+    "vcs-type": {
+      "unspecified": "未指定"
     },
     "actions": {
       "new-file": "新建文件",
@@ -2561,8 +2729,7 @@
     "messages": {
       "succeed-to-create-release": "成功创建发布",
       "files-will-always-be-sorted-and-executed-in-version-order": "文件将始终按照版本顺序排序和执行。",
-      "cannot-modify-files-after-created": "发布创建后您无法修改文件。",
-      "bytebase-will-skip-those-files-has-been-applied-on-target-database": "Bytebase 将自动跳过那些已经在目标数据库上执行过的文件。"
+      "cannot-modify-files-after-created": "发布创建后您无法修改文件。"
     },
     "usage-description": "发布包仅用于自定义的 GitOps 与 Bytebase API 集成。"
   },
@@ -2590,7 +2757,24 @@
     "self": "工作表"
   },
   "setup": {
-    "self": "设置"
+    "self": "设置",
+    "basic-info": "基本信息",
+    "skip-setup": "跳过设置",
+    "purposes": {
+      "self": "您使用 Bytebase 的主要目的是什么？",
+      "alter-schema": "变更 Schema",
+      "query-data": "查询数据"
+    },
+    "workflow": {
+      "self": "您使用数据库的工作流程是怎样的？",
+      "team": "与队友合作，需要 CI/CD 工作流",
+      "simple": "无需复杂的工作流程，需要 UI 工具"
+    },
+    "data": {
+      "self-setup": "设置项目",
+      "built-in": "使用内置示例",
+      "built-in-desc": "生成示例项目和实例"
+    }
   },
   "landing": {
     "quick-link": {

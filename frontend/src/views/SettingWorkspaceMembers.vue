@@ -1,7 +1,5 @@
 <template>
-  <div class="w-full mx-auto space-y-4">
-    <FeatureAttention feature="bb.feature.rbac" />
-
+  <div class="w-full mx-auto space-y-4 pb-4">
     <NoPermissionPlaceholder
       v-if="permissionStore.onlyWorkspaceMember"
       class="py-6"
@@ -14,6 +12,7 @@
           </p>
         </template>
         <MemberDataTable
+          scope="workspace"
           :allow-edit="allowEdit"
           :bindings="memberBindings"
           :selected-bindings="state.selectedMembers"
@@ -34,6 +33,7 @@
           </p>
         </template>
         <MemberDataTableByRole
+          scope="workspace"
           :allow-edit="allowEdit"
           :bindings-by-role="memberBindingsByRole"
           :on-click-user="onClickUser"
@@ -82,27 +82,26 @@
 
 <script setup lang="ts">
 import { computedAsync } from "@vueuse/core";
-import { NButton, NTabs, NTabPane, useDialog } from "naive-ui";
+import { NButton, NTabPane, NTabs, useDialog } from "naive-ui";
 import { computed, reactive } from "vue";
 import { useI18n } from "vue-i18n";
-import { FeatureAttention } from "@/components/FeatureGuard";
 import EditMemberRoleDrawer from "@/components/Member/EditMemberRoleDrawer.vue";
 import MemberDataTable from "@/components/Member/MemberDataTable/index.vue";
 import MemberDataTableByRole from "@/components/Member/MemberDataTableByRole.vue";
 import type { MemberBinding } from "@/components/Member/types";
 import {
-  getMemberBindingsByRole,
   getMemberBindings,
+  getMemberBindingsByRole,
 } from "@/components/Member/utils";
 import NoPermissionPlaceholder from "@/components/misc/NoPermissionPlaceholder.vue";
 import { SearchBox } from "@/components/v2";
 import {
   pushNotification,
   useCurrentUserV1,
-  useWorkspaceV1Store,
   usePermissionStore,
+  useWorkspaceV1Store,
 } from "@/store";
-import { userBindingPrefix, PresetRoleType } from "@/types";
+import { userBindingPrefix } from "@/types";
 import { User, UserType } from "@/types/proto/v1/user_service";
 import { hasWorkspacePermissionV2 } from "@/utils";
 
@@ -203,7 +202,7 @@ const memberBindingsByRole = computedAsync(() => {
       },
     ],
     searchText: state.searchText,
-    ignoreRoles: new Set([PresetRoleType.WORKSPACE_MEMBER]),
+    ignoreRoles: new Set([]),
   });
 }, new Map());
 

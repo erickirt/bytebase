@@ -3,6 +3,7 @@ package pg
 import (
 	"context"
 	"io"
+	"math"
 	"os"
 	"testing"
 
@@ -61,7 +62,7 @@ func TestRestore(t *testing.T) {
 				Column: 0,
 			},
 			EndPosition: &store.Position{
-				Line:   1000000000,
+				Line:   math.MaxInt32,
 				Column: 1,
 			},
 		})
@@ -83,7 +84,8 @@ func TestRestore(t *testing.T) {
 
 func fixedMockDatabaseMetadataGetter(_ context.Context, _ string, database string) (string, *model.DatabaseMetadata, error) {
 	return database, model.NewDatabaseMetadata(&store.DatabaseSchemaMetadata{
-		Name: database,
+		Name:       database,
+		SearchPath: "public",
 		Schemas: []*store.SchemaMetadata{
 			{
 				Name: "public",
@@ -164,6 +166,35 @@ func fixedMockDatabaseMetadataGetter(_ context.Context, _ string, database strin
 					},
 					{
 						Name: "test2",
+						Columns: []*store.ColumnMetadata{
+							{
+								Name: "a",
+							},
+							{
+								Name: "b",
+							},
+							{
+								Name: "c",
+							},
+						},
+					},
+					{
+						Name: "t",
+						Columns: []*store.ColumnMetadata{
+							{
+								Name: "a",
+							},
+							{
+								Name: "b",
+							},
+							{
+								Name: "c",
+							},
+						},
+					},
+
+					{
+						Name: "test1",
 						Columns: []*store.ColumnMetadata{
 							{
 								Name: "a",

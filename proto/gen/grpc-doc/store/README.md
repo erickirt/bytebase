@@ -123,6 +123,7 @@
     - [OIDCIdentityProviderConfig](#bytebase-store-OIDCIdentityProviderConfig)
   
     - [IdentityProviderType](#bytebase-store-IdentityProviderType)
+    - [LDAPIdentityProviderConfig.SecurityProtocol](#bytebase-store-LDAPIdentityProviderConfig-SecurityProtocol)
     - [OAuth2AuthStyle](#bytebase-store-OAuth2AuthStyle)
   
 - [store/instance.proto](#store_instance-proto)
@@ -149,7 +150,10 @@
   
 - [store/issue.proto](#store_issue-proto)
     - [GrantRequest](#bytebase-store-GrantRequest)
-    - [IssuePayload](#bytebase-store-IssuePayload)
+    - [Issue](#bytebase-store-Issue)
+  
+    - [Issue.Status](#bytebase-store-Issue-Status)
+    - [Issue.Type](#bytebase-store-Issue-Type)
   
 - [store/issue_comment.proto](#store_issue_comment-proto)
     - [IssueCommentPayload](#bytebase-store-IssueCommentPayload)
@@ -164,18 +168,6 @@
     - [IssueCommentPayload.IssueUpdate.IssueStatus](#bytebase-store-IssueCommentPayload-IssueUpdate-IssueStatus)
     - [IssueCommentPayload.TaskUpdate.Status](#bytebase-store-IssueCommentPayload-TaskUpdate-Status)
   
-- [store/plan_check_run.proto](#store_plan_check_run-proto)
-    - [PlanCheckRunConfig](#bytebase-store-PlanCheckRunConfig)
-    - [PlanCheckRunConfig.GhostFlagsEntry](#bytebase-store-PlanCheckRunConfig-GhostFlagsEntry)
-    - [PlanCheckRunResult](#bytebase-store-PlanCheckRunResult)
-    - [PlanCheckRunResult.Result](#bytebase-store-PlanCheckRunResult-Result)
-    - [PlanCheckRunResult.Result.SqlReviewReport](#bytebase-store-PlanCheckRunResult-Result-SqlReviewReport)
-    - [PlanCheckRunResult.Result.SqlSummaryReport](#bytebase-store-PlanCheckRunResult-Result-SqlSummaryReport)
-    - [PreUpdateBackupDetail](#bytebase-store-PreUpdateBackupDetail)
-  
-    - [PlanCheckRunConfig.ChangeDatabaseType](#bytebase-store-PlanCheckRunConfig-ChangeDatabaseType)
-    - [PlanCheckRunResult.Result.Status](#bytebase-store-PlanCheckRunResult-Result-Status)
-  
 - [store/plan.proto](#store_plan-proto)
     - [PlanConfig](#bytebase-store-PlanConfig)
     - [PlanConfig.ChangeDatabaseConfig](#bytebase-store-PlanConfig-ChangeDatabaseConfig)
@@ -184,12 +176,20 @@
     - [PlanConfig.Deployment](#bytebase-store-PlanConfig-Deployment)
     - [PlanConfig.Deployment.DatabaseGroupMapping](#bytebase-store-PlanConfig-Deployment-DatabaseGroupMapping)
     - [PlanConfig.ExportDataConfig](#bytebase-store-PlanConfig-ExportDataConfig)
-    - [PlanConfig.ReleaseSource](#bytebase-store-PlanConfig-ReleaseSource)
     - [PlanConfig.Spec](#bytebase-store-PlanConfig-Spec)
-    - [PlanConfig.SpecReleaseSource](#bytebase-store-PlanConfig-SpecReleaseSource)
-    - [PlanConfig.Step](#bytebase-store-PlanConfig-Step)
   
     - [PlanConfig.ChangeDatabaseConfig.Type](#bytebase-store-PlanConfig-ChangeDatabaseConfig-Type)
+  
+- [store/plan_check_run.proto](#store_plan_check_run-proto)
+    - [PlanCheckRunConfig](#bytebase-store-PlanCheckRunConfig)
+    - [PlanCheckRunConfig.GhostFlagsEntry](#bytebase-store-PlanCheckRunConfig-GhostFlagsEntry)
+    - [PlanCheckRunResult](#bytebase-store-PlanCheckRunResult)
+    - [PlanCheckRunResult.Result](#bytebase-store-PlanCheckRunResult-Result)
+    - [PlanCheckRunResult.Result.SqlReviewReport](#bytebase-store-PlanCheckRunResult-Result-SqlReviewReport)
+    - [PlanCheckRunResult.Result.SqlSummaryReport](#bytebase-store-PlanCheckRunResult-Result-SqlSummaryReport)
+  
+    - [PlanCheckRunConfig.ChangeDatabaseType](#bytebase-store-PlanCheckRunConfig-ChangeDatabaseType)
+    - [PlanCheckRunResult.Result.Status](#bytebase-store-PlanCheckRunResult-Result-Status)
   
 - [store/policy.proto](#store_policy-proto)
     - [Binding](#bytebase-store-Binding)
@@ -202,6 +202,7 @@
     - [MaskingExceptionPolicy.MaskingException](#bytebase-store-MaskingExceptionPolicy-MaskingException)
     - [MaskingRulePolicy](#bytebase-store-MaskingRulePolicy)
     - [MaskingRulePolicy.MaskingRule](#bytebase-store-MaskingRulePolicy-MaskingRule)
+    - [Policy](#bytebase-store-Policy)
     - [QueryDataPolicy](#bytebase-store-QueryDataPolicy)
     - [RestrictIssueCreationForSQLReviewPolicy](#bytebase-store-RestrictIssueCreationForSQLReviewPolicy)
     - [RolloutPolicy](#bytebase-store-RolloutPolicy)
@@ -212,6 +213,8 @@
     - [DataSourceQueryPolicy.Restriction](#bytebase-store-DataSourceQueryPolicy-Restriction)
     - [EnvironmentTierPolicy.EnvironmentTier](#bytebase-store-EnvironmentTierPolicy-EnvironmentTier)
     - [MaskingExceptionPolicy.MaskingException.Action](#bytebase-store-MaskingExceptionPolicy-MaskingException-Action)
+    - [Policy.Resource](#bytebase-store-Policy-Resource)
+    - [Policy.Type](#bytebase-store-Policy-Type)
     - [SQLReviewRuleLevel](#bytebase-store-SQLReviewRuleLevel)
   
 - [store/project.proto](#store_project-proto)
@@ -269,7 +272,6 @@
     - [MaximumSQLResultSizeSetting](#bytebase-store-MaximumSQLResultSizeSetting)
     - [PasswordRestrictionSetting](#bytebase-store-PasswordRestrictionSetting)
     - [SCIMSetting](#bytebase-store-SCIMSetting)
-    - [SMTPMailDeliverySetting](#bytebase-store-SMTPMailDeliverySetting)
     - [SchemaTemplateSetting](#bytebase-store-SchemaTemplateSetting)
     - [SchemaTemplateSetting.ColumnType](#bytebase-store-SchemaTemplateSetting-ColumnType)
     - [SchemaTemplateSetting.FieldTemplate](#bytebase-store-SchemaTemplateSetting-FieldTemplate)
@@ -284,17 +286,18 @@
     - [Algorithm.InnerOuterMask.MaskType](#bytebase-store-Algorithm-InnerOuterMask-MaskType)
     - [Announcement.AlertLevel](#bytebase-store-Announcement-AlertLevel)
     - [DatabaseChangeMode](#bytebase-store-DatabaseChangeMode)
-    - [SMTPMailDeliverySetting.Authentication](#bytebase-store-SMTPMailDeliverySetting-Authentication)
-    - [SMTPMailDeliverySetting.Encryption](#bytebase-store-SMTPMailDeliverySetting-Encryption)
+    - [SettingName](#bytebase-store-SettingName)
   
 - [store/sheet.proto](#store_sheet-proto)
     - [SheetCommand](#bytebase-store-SheetCommand)
     - [SheetPayload](#bytebase-store-SheetPayload)
   
 - [store/task.proto](#store_task-proto)
-    - [TaskPayload](#bytebase-store-TaskPayload)
-    - [TaskPayload.FlagsEntry](#bytebase-store-TaskPayload-FlagsEntry)
+    - [Task](#bytebase-store-Task)
+    - [Task.FlagsEntry](#bytebase-store-Task-FlagsEntry)
     - [TaskReleaseSource](#bytebase-store-TaskReleaseSource)
+  
+    - [Task.Type](#bytebase-store-Task-Type)
   
 - [store/task_run.proto](#store_task_run-proto)
     - [PriorBackupDetail](#bytebase-store-PriorBackupDetail)
@@ -302,7 +305,10 @@
     - [PriorBackupDetail.Item.Table](#bytebase-store-PriorBackupDetail-Item-Table)
     - [SchedulerInfo](#bytebase-store-SchedulerInfo)
     - [SchedulerInfo.WaitingCause](#bytebase-store-SchedulerInfo-WaitingCause)
+    - [TaskRun](#bytebase-store-TaskRun)
     - [TaskRunResult](#bytebase-store-TaskRunResult)
+  
+    - [TaskRun.Status](#bytebase-store-TaskRun-Status)
   
 - [store/task_run_log.proto](#store_task_run_log-proto)
     - [TaskRunLog](#bytebase-store-TaskRunLog)
@@ -325,6 +331,8 @@
 - [store/user.proto](#store_user-proto)
     - [MFAConfig](#bytebase-store-MFAConfig)
     - [UserProfile](#bytebase-store-UserProfile)
+  
+    - [PrincipalType](#bytebase-store-PrincipalType)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -593,7 +601,6 @@ offset.
 | flow | [ApprovalFlow](#bytebase-store-ApprovalFlow) |  |  |
 | title | [string](#string) |  |  |
 | description | [string](#string) |  |  |
-| creator_id | [int32](#int32) |  |  |
 
 
 
@@ -811,7 +818,6 @@ Metadata about the request.
 | ----- | ---- | ----- | ----------- |
 | sheet | [string](#string) |  | The name of a sheet. |
 | source | [string](#string) |  | The source of origin. 1) changes: instances/{instance}/databases/{database}/changelogs/{changelog}. 2) raw SQL if empty. |
-| version | [string](#string) |  | The migration version for a change. |
 
 
 
@@ -1135,6 +1141,7 @@ DatabaseMetadata is the metadata for databases.
 | datashare | [bool](#bool) |  |  |
 | secrets | [Secret](#bytebase-store-Secret) | repeated |  |
 | drifted | [bool](#bool) |  | The schema is drifted from the source of truth. |
+| version | [string](#string) |  | The version of database schema. |
 
 
 
@@ -1174,6 +1181,7 @@ DatabaseSchemaMetadata is the schema metadata for databases.
 | service_name | [string](#string) |  | The service name of the database. It&#39;s the Oracle specific concept. |
 | linked_databases | [LinkedDatabaseMetadata](#bytebase-store-LinkedDatabaseMetadata) | repeated |  |
 | owner | [string](#string) |  |  |
+| search_path | [string](#string) |  | The search_path is the search path of a PostgreSQL database. |
 
 
 
@@ -1714,6 +1722,7 @@ TablePartitionMetadata is the metadata for table partitions.
 | use_default | [string](#string) |  | The use_default is whether the users use the default partition, it stores the different value for different database engines. For MySQL, it&#39;s [INT] type, 0 means not use default partition, otherwise, it&#39;s equals to number in syntax [SUB]PARTITION {number}. |
 | subpartitions | [TablePartitionMetadata](#bytebase-store-TablePartitionMetadata) | repeated | The subpartitions is the list of subpartitions in a table partition. |
 | indexes | [IndexMetadata](#bytebase-store-IndexMetadata) | repeated |  |
+| check_constraints | [CheckConstraintMetadata](#bytebase-store-CheckConstraintMetadata) | repeated |  |
 
 
 
@@ -2101,7 +2110,7 @@ LDAPIdentityProviderConfig is the structure for LDAP identity provider config.
 | bind_password | [string](#string) |  | BindPassword is the password of the user to bind as a service account. |
 | base_dn | [string](#string) |  | BaseDN is the base DN to search for users, e.g. &#34;ou=users,dc=example,dc=com&#34;. |
 | user_filter | [string](#string) |  | UserFilter is the filter to search for users, e.g. &#34;(uid=%s)&#34;. |
-| security_protocol | [string](#string) |  | SecurityProtocol is the security protocol to be used for establishing connections with the LDAP server. It should be either StartTLS or LDAPS, and cannot be empty. |
+| security_protocol | [LDAPIdentityProviderConfig.SecurityProtocol](#bytebase-store-LDAPIdentityProviderConfig-SecurityProtocol) |  | SecurityProtocol is the security protocol to be used for establishing connections with the LDAP server. |
 | field_mapping | [FieldMapping](#bytebase-store-FieldMapping) |  | FieldMapping is the mapping of the user attributes returned by the LDAP server. |
 
 
@@ -2166,6 +2175,19 @@ OIDCIdentityProviderConfig is the structure for OIDC identity provider config.
 | OAUTH2 | 1 |  |
 | OIDC | 2 |  |
 | LDAP | 3 |  |
+
+
+
+<a name="bytebase-store-LDAPIdentityProviderConfig-SecurityProtocol"></a>
+
+### LDAPIdentityProviderConfig.SecurityProtocol
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| SECURITY_PROTOCOL_UNSPECIFIED | 0 |  |
+| START_TLS | 1 | StartTLS is the security protocol that starts with an unencrypted connection and then upgrades to TLS. |
+| LDAPS | 2 | LDAPS is the security protocol that uses TLS from the beginning. |
 
 
 
@@ -2571,9 +2593,9 @@ InstanceRole is the API message for instance role.
 
 
 
-<a name="bytebase-store-IssuePayload"></a>
+<a name="bytebase-store-Issue"></a>
 
-### IssuePayload
+### Issue
 
 
 
@@ -2588,6 +2610,34 @@ InstanceRole is the API message for instance role.
 
 
  
+
+
+<a name="bytebase-store-Issue-Status"></a>
+
+### Issue.Status
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| ISSUE_STATUS_UNSPECIFIED | 0 |  |
+| OPEN | 1 |  |
+| DONE | 2 |  |
+| CANCELED | 3 |  |
+
+
+
+<a name="bytebase-store-Issue-Type"></a>
+
+### Issue.Type
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| ISSUE_TYPE_UNSPECIFIED | 0 |  |
+| DATABASE_CHANGE | 1 |  |
+| GRANT_REQUEST | 2 |  |
+| DATABASE_EXPORT | 3 |  |
+
 
  
 
@@ -2722,8 +2772,6 @@ InstanceRole is the API message for instance role.
 | tasks | [string](#string) | repeated |  |
 | from_sheet | [string](#string) | optional | Format: projects/{project}/sheets/{sheet} |
 | to_sheet | [string](#string) | optional | Format: projects/{project}/sheets/{sheet} |
-| from_earliest_allowed_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) | optional |  |
-| to_earliest_allowed_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) | optional |  |
 | to_status | [IssueCommentPayload.TaskUpdate.Status](#bytebase-store-IssueCommentPayload-TaskUpdate-Status) | optional |  |
 
 
@@ -2785,6 +2833,179 @@ InstanceRole is the API message for instance role.
 
 
 
+<a name="store_plan-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## store/plan.proto
+
+
+
+<a name="bytebase-store-PlanConfig"></a>
+
+### PlanConfig
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| specs | [PlanConfig.Spec](#bytebase-store-PlanConfig-Spec) | repeated |  |
+| deployment | [PlanConfig.Deployment](#bytebase-store-PlanConfig-Deployment) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-PlanConfig-ChangeDatabaseConfig"></a>
+
+### PlanConfig.ChangeDatabaseConfig
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| targets | [string](#string) | repeated | The list of targets. Multi-database format: [instances/{instance-id}/databases/{database-name}]. Single database group format: [projects/{project}/databaseGroups/{databaseGroup}]. |
+| sheet | [string](#string) |  | The resource name of the sheet. Format: projects/{project}/sheets/{sheet} |
+| release | [string](#string) |  | The resource name of the release. Format: projects/{project}/releases/{release} |
+| type | [PlanConfig.ChangeDatabaseConfig.Type](#bytebase-store-PlanConfig-ChangeDatabaseConfig-Type) |  |  |
+| ghost_flags | [PlanConfig.ChangeDatabaseConfig.GhostFlagsEntry](#bytebase-store-PlanConfig-ChangeDatabaseConfig-GhostFlagsEntry) | repeated |  |
+| enable_prior_backup | [bool](#bool) |  | If set, a backup of the modified data will be created automatically before any changes are applied. |
+
+
+
+
+
+
+<a name="bytebase-store-PlanConfig-ChangeDatabaseConfig-GhostFlagsEntry"></a>
+
+### PlanConfig.ChangeDatabaseConfig.GhostFlagsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-PlanConfig-CreateDatabaseConfig"></a>
+
+### PlanConfig.CreateDatabaseConfig
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| target | [string](#string) |  | The resource name of the instance on which the database is created. Format: instances/{instance} |
+| database | [string](#string) |  | The name of the database to create. |
+| table | [string](#string) |  | table is the name of the table, if it is not empty, Bytebase should create a table after creating the database. For example, in MongoDB, it only creates the database when we first store data in that database. |
+| character_set | [string](#string) |  | character_set is the character set of the database. |
+| collation | [string](#string) |  | collation is the collation of the database. |
+| cluster | [string](#string) |  | cluster is the cluster of the database. This is only applicable to ClickHouse for &#34;ON CLUSTER &lt;&lt;cluster&gt;&gt;&#34;. |
+| owner | [string](#string) |  | owner is the owner of the database. This is only applicable to Postgres for &#34;WITH OWNER &lt;&lt;owner&gt;&gt;&#34;. |
+| environment | [string](#string) |  | The environment resource. Format: environments/prod where prod is the environment resource ID. |
+
+
+
+
+
+
+<a name="bytebase-store-PlanConfig-Deployment"></a>
+
+### PlanConfig.Deployment
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| environments | [string](#string) | repeated | The environments deploy order. |
+| database_group_mappings | [PlanConfig.Deployment.DatabaseGroupMapping](#bytebase-store-PlanConfig-Deployment-DatabaseGroupMapping) | repeated | The database group mapping. |
+
+
+
+
+
+
+<a name="bytebase-store-PlanConfig-Deployment-DatabaseGroupMapping"></a>
+
+### PlanConfig.Deployment.DatabaseGroupMapping
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| database_group | [string](#string) |  | Format: projects/{project}/databaseGroups/{databaseGroup}. |
+| databases | [string](#string) | repeated | Format: instances/{instance-id}/databases/{database-name}. |
+
+
+
+
+
+
+<a name="bytebase-store-PlanConfig-ExportDataConfig"></a>
+
+### PlanConfig.ExportDataConfig
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| targets | [string](#string) | repeated | The list of targets. Multi-database format: [instances/{instance-id}/databases/{database-name}]. Single database group format: [projects/{project}/databaseGroups/{databaseGroup}]. |
+| sheet | [string](#string) |  | The resource name of the sheet. Format: projects/{project}/sheets/{sheet} |
+| format | [ExportFormat](#bytebase-store-ExportFormat) |  | The format of the exported file. |
+| password | [string](#string) | optional | The zip password provide by users. Leave it empty if no needs to encrypt the zip file. |
+
+
+
+
+
+
+<a name="bytebase-store-PlanConfig-Spec"></a>
+
+### PlanConfig.Spec
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | [string](#string) |  | A UUID4 string that uniquely identifies the Spec. |
+| create_database_config | [PlanConfig.CreateDatabaseConfig](#bytebase-store-PlanConfig-CreateDatabaseConfig) |  |  |
+| change_database_config | [PlanConfig.ChangeDatabaseConfig](#bytebase-store-PlanConfig-ChangeDatabaseConfig) |  |  |
+| export_data_config | [PlanConfig.ExportDataConfig](#bytebase-store-PlanConfig-ExportDataConfig) |  |  |
+
+
+
+
+
+ 
+
+
+<a name="bytebase-store-PlanConfig-ChangeDatabaseConfig-Type"></a>
+
+### PlanConfig.ChangeDatabaseConfig.Type
+Type is the database change type.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TYPE_UNSPECIFIED | 0 |  |
+| MIGRATE | 2 | Used for DDL changes including CREATE DATABASE. |
+| MIGRATE_SDL | 3 | Used for schema changes via state-based schema migration including CREATE DATABASE. |
+| MIGRATE_GHOST | 4 | Used for DDL changes using gh-ost. |
+| DATA | 6 | Used for DML change. |
+
+
+ 
+
+ 
+
+ 
+
+
+
 <a name="store_plan_check_run-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -2806,7 +3027,7 @@ InstanceRole is the API message for instance role.
 | database_name | [string](#string) |  |  |
 | database_group_uid | [int64](#int64) | optional | **Deprecated.**  |
 | ghost_flags | [PlanCheckRunConfig.GhostFlagsEntry](#bytebase-store-PlanCheckRunConfig-GhostFlagsEntry) | repeated |  |
-| pre_update_backup_detail | [PreUpdateBackupDetail](#bytebase-store-PreUpdateBackupDetail) | optional | If set, a backup of the modified data will be created automatically before any changes are applied. |
+| enable_prior_backup | [bool](#bool) |  | If set, a backup of the modified data will be created automatically before any changes are applied. |
 
 
 
@@ -2899,21 +3120,6 @@ InstanceRole is the API message for instance role.
 
 
 
-
-<a name="bytebase-store-PreUpdateBackupDetail"></a>
-
-### PreUpdateBackupDetail
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| database | [string](#string) |  | The database for keeping the backup data. Format: instances/{instance}/databases/{database} |
-
-
-
-
-
  
 
 
@@ -2944,230 +3150,6 @@ InstanceRole is the API message for instance role.
 | ERROR | 1 |  |
 | WARNING | 2 |  |
 | SUCCESS | 3 |  |
-
-
- 
-
- 
-
- 
-
-
-
-<a name="store_plan-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## store/plan.proto
-
-
-
-<a name="bytebase-store-PlanConfig"></a>
-
-### PlanConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| steps | [PlanConfig.Step](#bytebase-store-PlanConfig-Step) | repeated |  |
-| release_source | [PlanConfig.ReleaseSource](#bytebase-store-PlanConfig-ReleaseSource) |  |  |
-| deployment | [PlanConfig.Deployment](#bytebase-store-PlanConfig-Deployment) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-ChangeDatabaseConfig"></a>
-
-### PlanConfig.ChangeDatabaseConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| target | [string](#string) |  | The resource name of the target. Format: instances/{instance-id}/databases/{database-name}. Format: projects/{project}/databaseGroups/{databaseGroup}. |
-| sheet | [string](#string) |  | The resource name of the sheet. Format: projects/{project}/sheets/{sheet} |
-| type | [PlanConfig.ChangeDatabaseConfig.Type](#bytebase-store-PlanConfig-ChangeDatabaseConfig-Type) |  |  |
-| schema_version | [string](#string) |  | schema_version is parsed from file name. It is automatically generated in the UI workflow. |
-| ghost_flags | [PlanConfig.ChangeDatabaseConfig.GhostFlagsEntry](#bytebase-store-PlanConfig-ChangeDatabaseConfig-GhostFlagsEntry) | repeated |  |
-| pre_update_backup_detail | [PreUpdateBackupDetail](#bytebase-store-PreUpdateBackupDetail) | optional | If set, a backup of the modified data will be created automatically before any changes are applied. |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-ChangeDatabaseConfig-GhostFlagsEntry"></a>
-
-### PlanConfig.ChangeDatabaseConfig.GhostFlagsEntry
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| key | [string](#string) |  |  |
-| value | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-CreateDatabaseConfig"></a>
-
-### PlanConfig.CreateDatabaseConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| target | [string](#string) |  | The resource name of the instance on which the database is created. Format: instances/{instance} |
-| database | [string](#string) |  | The name of the database to create. |
-| table | [string](#string) |  | table is the name of the table, if it is not empty, Bytebase should create a table after creating the database. For example, in MongoDB, it only creates the database when we first store data in that database. |
-| character_set | [string](#string) |  | character_set is the character set of the database. |
-| collation | [string](#string) |  | collation is the collation of the database. |
-| cluster | [string](#string) |  | cluster is the cluster of the database. This is only applicable to ClickHouse for &#34;ON CLUSTER &lt;&lt;cluster&gt;&gt;&#34;. |
-| owner | [string](#string) |  | owner is the owner of the database. This is only applicable to Postgres for &#34;WITH OWNER &lt;&lt;owner&gt;&gt;&#34;. |
-| backup | [string](#string) |  | backup is the resource name of the backup. Format: instances/{instance}/databases/{database}/backups/{backup-name} |
-| environment | [string](#string) |  | The environment resource. Format: environments/prod where prod is the environment resource ID. |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-Deployment"></a>
-
-### PlanConfig.Deployment
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| environments | [string](#string) | repeated | The environments deploy order. |
-| database_group_mappings | [PlanConfig.Deployment.DatabaseGroupMapping](#bytebase-store-PlanConfig-Deployment-DatabaseGroupMapping) | repeated | The database group mapping. |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-Deployment-DatabaseGroupMapping"></a>
-
-### PlanConfig.Deployment.DatabaseGroupMapping
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| database_group | [string](#string) |  | Format: projects/{project}/databaseGroups/{databaseGroup}. |
-| databases | [string](#string) | repeated | Format: instances/{instance-id}/databases/{database-name}. |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-ExportDataConfig"></a>
-
-### PlanConfig.ExportDataConfig
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| target | [string](#string) |  | The resource name of the target. Format: instances/{instance-id}/databases/{database-name} |
-| sheet | [string](#string) |  | The resource name of the sheet. Format: projects/{project}/sheets/{sheet} |
-| format | [ExportFormat](#bytebase-store-ExportFormat) |  | The format of the exported file. |
-| password | [string](#string) | optional | The zip password provide by users. Leave it empty if no needs to encrypt the zip file. |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-ReleaseSource"></a>
-
-### PlanConfig.ReleaseSource
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| release | [string](#string) |  | The release. Format: projects/{project}/releases/{release} |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-Spec"></a>
-
-### PlanConfig.Spec
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| earliest_allowed_time | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | earliest_allowed_time the earliest execution time of the change. |
-| id | [string](#string) |  | A UUID4 string that uniquely identifies the Spec. |
-| spec_release_source | [PlanConfig.SpecReleaseSource](#bytebase-store-PlanConfig-SpecReleaseSource) |  |  |
-| create_database_config | [PlanConfig.CreateDatabaseConfig](#bytebase-store-PlanConfig-CreateDatabaseConfig) |  |  |
-| change_database_config | [PlanConfig.ChangeDatabaseConfig](#bytebase-store-PlanConfig-ChangeDatabaseConfig) |  |  |
-| export_data_config | [PlanConfig.ExportDataConfig](#bytebase-store-PlanConfig-ExportDataConfig) |  |  |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-SpecReleaseSource"></a>
-
-### PlanConfig.SpecReleaseSource
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| file | [string](#string) |  | Format: projects/{project}/releases/{release}/files/{id} |
-
-
-
-
-
-
-<a name="bytebase-store-PlanConfig-Step"></a>
-
-### PlanConfig.Step
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| title | [string](#string) |  | Use the title if set. Use a generated title if empty. |
-| specs | [PlanConfig.Spec](#bytebase-store-PlanConfig-Spec) | repeated |  |
-
-
-
-
-
- 
-
-
-<a name="bytebase-store-PlanConfig-ChangeDatabaseConfig-Type"></a>
-
-### PlanConfig.ChangeDatabaseConfig.Type
-Type is the database change type.
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| TYPE_UNSPECIFIED | 0 |  |
-| BASELINE | 1 | Used for establishing schema baseline, this is used when 1. Onboard the database into Bytebase since Bytebase needs to know the current database schema. 2. Had schema drift and need to re-establish the baseline. |
-| MIGRATE | 2 | Used for DDL changes including CREATE DATABASE. |
-| MIGRATE_SDL | 3 | Used for schema changes via state-based schema migration including CREATE DATABASE. |
-| MIGRATE_GHOST | 4 | Used for DDL changes using gh-ost. |
-| DATA | 6 | Used for DML change. |
 
 
  
@@ -3346,6 +3328,16 @@ Format: users/{userUID} or groups/{group email} |
 
 
 
+<a name="bytebase-store-Policy"></a>
+
+### Policy
+
+
+
+
+
+
+
 <a name="bytebase-store-QueryDataPolicy"></a>
 
 ### QueryDataPolicy
@@ -3484,6 +3476,41 @@ RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restrict
 
 
 
+<a name="bytebase-store-Policy-Resource"></a>
+
+### Policy.Resource
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| RESOURCE_UNSPECIFIED | 0 |  |
+| WORKSPACE | 1 |  |
+| ENVIRONMENT | 2 |  |
+| PROJECT | 3 |  |
+
+
+
+<a name="bytebase-store-Policy-Type"></a>
+
+### Policy.Type
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TYPE_UNSPECIFIED | 0 |  |
+| ROLLOUT | 1 |  |
+| MASKING_EXCEPTION | 2 |  |
+| DISABLE_COPY_DATA | 3 |  |
+| EXPORT_DATA | 4 |  |
+| QUERY_DATA | 5 |  |
+| MASKING_RULE | 6 |  |
+| RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW | 7 |  |
+| IAM | 8 |  |
+| TAG | 9 |  |
+| DATA_SOURCE_QUERY | 10 |  |
+
+
+
 <a name="bytebase-store-SQLReviewRuleLevel"></a>
 
 ### SQLReviewRuleLevel
@@ -3548,6 +3575,7 @@ RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restrict
 | allow_self_approval | [bool](#bool) |  | Whether to allow the issue creator to self-approve the issue. |
 | execution_retry_policy | [Project.ExecutionRetryPolicy](#bytebase-store-Project-ExecutionRetryPolicy) |  | Execution retry policy for the task run. |
 | ci_sampling_size | [int32](#int32) |  | The maximum number of databases to sample during CI data validation. Without specification, sampling is disabled, resulting in a full validation. |
+| parallel_tasks_per_rollout | [int32](#int32) |  | The maximum number of parallel tasks to run during the rollout. |
 
 
 
@@ -4282,30 +4310,6 @@ RestrictIssueCreationForSQLReviewPolicy is the policy configuration for restrict
 
 
 
-<a name="bytebase-store-SMTPMailDeliverySetting"></a>
-
-### SMTPMailDeliverySetting
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| server | [string](#string) |  | The SMTP server address. |
-| port | [int32](#int32) |  | The SMTP server port. |
-| encryption | [SMTPMailDeliverySetting.Encryption](#bytebase-store-SMTPMailDeliverySetting-Encryption) |  | The SMTP server encryption. |
-| ca | [string](#string) |  | The CA, KEY, and CERT for the SMTP server. |
-| key | [string](#string) |  |  |
-| cert | [string](#string) |  |  |
-| authentication | [SMTPMailDeliverySetting.Authentication](#bytebase-store-SMTPMailDeliverySetting-Authentication) |  |  |
-| username | [string](#string) |  |  |
-| password | [string](#string) |  |  |
-| from | [string](#string) |  | The sender email address. |
-
-
-
-
-
-
 <a name="bytebase-store-SchemaTemplateSetting"></a>
 
 ### SchemaTemplateSetting
@@ -4525,33 +4529,32 @@ We support three levels of AlertLevel: INFO, WARNING, and ERROR.
 
 
 
-<a name="bytebase-store-SMTPMailDeliverySetting-Authentication"></a>
+<a name="bytebase-store-SettingName"></a>
 
-### SMTPMailDeliverySetting.Authentication
-We support four types of SMTP authentication: NONE, PLAIN, LOGIN, and
-CRAM-MD5.
+### SettingName
+
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| AUTHENTICATION_UNSPECIFIED | 0 |  |
-| AUTHENTICATION_NONE | 1 |  |
-| AUTHENTICATION_PLAIN | 2 |  |
-| AUTHENTICATION_LOGIN | 3 |  |
-| AUTHENTICATION_CRAM_MD5 | 4 |  |
-
-
-
-<a name="bytebase-store-SMTPMailDeliverySetting-Encryption"></a>
-
-### SMTPMailDeliverySetting.Encryption
-We support three types of SMTP encryption: NONE, STARTTLS, and SSL/TLS.
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| ENCRYPTION_UNSPECIFIED | 0 |  |
-| ENCRYPTION_NONE | 1 |  |
-| ENCRYPTION_STARTTLS | 2 |  |
-| ENCRYPTION_SSL_TLS | 3 |  |
+| SETTING_NAME_UNSPECIFIED | 0 |  |
+| AUTH_SECRET | 1 |  |
+| BRANDING_LOGO | 2 |  |
+| WORKSPACE_ID | 3 |  |
+| WORKSPACE_PROFILE | 4 |  |
+| WORKSPACE_APPROVAL | 5 |  |
+| WORKSPACE_EXTERNAL_APPROVAL | 6 |  |
+| ENTERPRISE_LICENSE | 7 |  |
+| APP_IM | 8 |  |
+| WATERMARK | 9 |  |
+| AI | 10 |  |
+| PLUGIN_AGENT | 11 |  |
+| SCHEMA_TEMPLATE | 13 |  |
+| DATA_CLASSIFICATION | 14 |  |
+| SEMANTIC_TYPES | 15 |  |
+| SQL_RESULT_SIZE_LIMIT | 16 |  |
+| SCIM | 17 |  |
+| PASSWORD_RESTRICTION | 18 |  |
+| ENVIRONMENT | 19 |  |
 
 
  
@@ -4617,9 +4620,9 @@ We support three types of SMTP encryption: NONE, STARTTLS, and SSL/TLS.
 
 
 
-<a name="bytebase-store-TaskPayload"></a>
+<a name="bytebase-store-Task"></a>
 
-### TaskPayload
+### Task
 
 
 
@@ -4635,8 +4638,8 @@ We support three types of SMTP encryption: NONE, STARTTLS, and SSL/TLS.
 | character_set | [string](#string) |  |  |
 | collation | [string](#string) |  |  |
 | schema_version | [string](#string) |  | Update database fields. |
-| pre_update_backup_detail | [PreUpdateBackupDetail](#bytebase-store-PreUpdateBackupDetail) |  |  |
-| flags | [TaskPayload.FlagsEntry](#bytebase-store-TaskPayload-FlagsEntry) | repeated | ghost flags. |
+| enable_prior_backup | [bool](#bool) |  |  |
+| flags | [Task.FlagsEntry](#bytebase-store-Task-FlagsEntry) | repeated | ghost flags. |
 | task_release_source | [TaskReleaseSource](#bytebase-store-TaskReleaseSource) |  |  |
 | password | [string](#string) |  | Export data fields. |
 | format | [ExportFormat](#bytebase-store-ExportFormat) |  |  |
@@ -4646,9 +4649,9 @@ We support three types of SMTP encryption: NONE, STARTTLS, and SSL/TLS.
 
 
 
-<a name="bytebase-store-TaskPayload-FlagsEntry"></a>
+<a name="bytebase-store-Task-FlagsEntry"></a>
 
-### TaskPayload.FlagsEntry
+### Task.FlagsEntry
 
 
 
@@ -4677,6 +4680,22 @@ We support three types of SMTP encryption: NONE, STARTTLS, and SSL/TLS.
 
 
  
+
+
+<a name="bytebase-store-Task-Type"></a>
+
+### Task.Type
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| TASK_TYPE_UNSPECIFIED | 0 |  |
+| DATABASE_CREATE | 1 |  |
+| DATABASE_SCHEMA_UPDATE | 2 |  |
+| DATABASE_SCHEMA_UPDATE_GHOST | 3 |  |
+| DATABASE_DATA_UPDATE | 4 |  |
+| DATABASE_EXPORT | 5 |  |
+
 
  
 
@@ -4769,6 +4788,17 @@ We support three types of SMTP encryption: NONE, STARTTLS, and SSL/TLS.
 | ----- | ---- | ----- | ----------- |
 | connection_limit | [bool](#bool) |  |  |
 | task_uid | [int32](#int32) |  |  |
+| parallel_tasks_limit | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="bytebase-store-TaskRun"></a>
+
+### TaskRun
+
 
 
 
@@ -4796,6 +4826,24 @@ We support three types of SMTP encryption: NONE, STARTTLS, and SSL/TLS.
 
 
  
+
+
+<a name="bytebase-store-TaskRun-Status"></a>
+
+### TaskRun.Status
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| STATUS_UNSPECIFIED | 0 |  |
+| PENDING | 1 |  |
+| RUNNING | 2 |  |
+| DONE | 3 |  |
+| FAILED | 4 |  |
+| CANCELED | 5 |  |
+| NOT_STARTED | 6 |  |
+| SKIPPED | 7 |  |
+
 
  
 
@@ -5096,6 +5144,20 @@ MFAConfig is the MFA configuration for a user.
 
 
  
+
+
+<a name="bytebase-store-PrincipalType"></a>
+
+### PrincipalType
+PrincipalType is the type of a principal.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| PRINCIPAL_TYPE_UNSPECIFIED | 0 |  |
+| END_USER | 1 | END_USER represents the human being using Bytebase. |
+| SERVICE_ACCOUNT | 2 | SERVICE_ACCOUNT represents the external service calling Bytebase OpenAPI. |
+| SYSTEM_BOT | 3 | SYSTEM_BOT represents the internal system bot performing operations. |
+
 
  
 

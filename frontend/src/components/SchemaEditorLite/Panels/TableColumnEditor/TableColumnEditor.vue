@@ -67,9 +67,11 @@ import LabelEditorDrawer from "@/components/LabelEditorDrawer.vue";
 import SemanticTypesDrawer from "@/components/SensitiveData/components/SemanticTypesDrawer.vue";
 import { InlineInput } from "@/components/v2";
 import { useSettingV1Store, hasFeature } from "@/store";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import type { ComposedDatabase } from "@/types";
 import { Engine } from "@/types/proto/v1/common";
 import { ColumnCatalog } from "@/types/proto/v1/database_catalog_service";
+import { Setting_SettingName } from "@/types/proto/v1/setting_service";
 import type {
   ColumnMetadata,
   DatabaseMetadata,
@@ -236,7 +238,7 @@ const markColumnStatus = (
 
 const semanticTypeList = computed(() => {
   return (
-    settingStore.getSettingByName("bb.workspace.semantic-types")?.value
+    settingStore.getSettingByName(Setting_SettingName.SEMANTIC_TYPES)?.value
       ?.semanticTypeSettingValue?.types ?? []
   );
 });
@@ -377,7 +379,7 @@ const columns = computed(() => {
       maxWidth: 320,
       hide:
         !props.showDatabaseCatalogColumn ||
-        !hasFeature("bb.feature.sensitive-data"),
+        !hasFeature(PlanFeature.FEATURE_DATA_MASKING),
       render: (column) => {
         return h(SemanticTypeCell, {
           database: props.database.name,
@@ -622,7 +624,7 @@ const isColumnPrimaryKey = (column: ColumnMetadata): boolean => {
 };
 
 const schemaTemplateColumnTypes = computed(() => {
-  const setting = settingStore.getSettingByName("bb.workspace.schema-template");
+  const setting = settingStore.getSettingByName(Setting_SettingName.SCHEMA_TEMPLATE);
   const columnTypes = setting?.value?.schemaTemplateSettingValue?.columnTypes;
   if (columnTypes && columnTypes.length > 0) {
     const columnType = columnTypes.find(

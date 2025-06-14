@@ -1,17 +1,17 @@
 <template>
   <div class="w-full space-y-4">
-    <FeatureAttention feature="bb.feature.audit-log" />
+    <FeatureAttention :feature="PlanFeature.FEATURE_AUDIT_LOG" />
     <AuditLogSearch v-model:params="state.params">
       <template #searchbox-suffix>
         <DataExportButton
           size="medium"
-          :file-type="'raw'"
           :support-formats="[
             ExportFormat.CSV,
             ExportFormat.JSON,
             ExportFormat.XLSX,
           ]"
           :tooltip="disableExportTip"
+          :view-mode="'DROPDOWN'"
           :disabled="!hasAuditLogFeature || !!disableExportTip"
           @export="handleExport"
         />
@@ -40,7 +40,6 @@
 <script setup lang="ts">
 import dayjs from "dayjs";
 import { NEmpty } from "naive-ui";
-import type { BinaryLike } from "node:crypto";
 import { computed, reactive, ref, watch } from "vue";
 // https://github.com/vuejs/language-tools/issues/3206
 import type { ComponentExposed } from "vue-component-type-helpers";
@@ -48,19 +47,18 @@ import { useI18n } from "vue-i18n";
 import AuditLogDataTable from "@/components/AuditLog/AuditLogDataTable.vue";
 import AuditLogSearch from "@/components/AuditLog/AuditLogSearch";
 import { buildSearchAuditLogParams } from "@/components/AuditLog/AuditLogSearch/utils";
-import type { ExportOption } from "@/components/DataExportButton.vue";
+import type {
+  ExportOption,
+  DownloadContent,
+} from "@/components/DataExportButton.vue";
 import DataExportButton from "@/components/DataExportButton.vue";
 import { FeatureAttention } from "@/components/FeatureGuard";
 import PagedTable from "@/components/v2/Model/PagedTable.vue";
-import {
-  featureToRef,
-  useAuditLogStore,
-  batchGetOrFetchUsers,
-  pushNotification,
-} from "@/store";
+import { featureToRef, useAuditLogStore, useUserStore } from "@/store";
 import { type SearchAuditLogsParams } from "@/types";
 import type { AuditLog } from "@/types/proto/v1/audit_log_service";
 import { ExportFormat } from "@/types/proto/v1/common";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import type { SearchParams, SearchScope } from "@/utils";
 
 interface LocalState {
@@ -76,9 +74,17 @@ const readonlyScopes = computed((): SearchScope[] => {
 });
 
 const defaultSearchParams = () => {
+  const to = dayjs().endOf("day");
+  const from = to.add(-30, "day");
   const params: SearchParams = {
     query: "",
-    scopes: [...readonlyScopes.value],
+    scopes: [
+      ...readonlyScopes.value,
+      {
+        id: "created",
+        value: `${from.valueOf()},${to.valueOf()}`,
+      },
+    ],
   };
   return params;
 };
@@ -93,7 +99,7 @@ watch(
 );
 
 const { t } = useI18n();
-const hasAuditLogFeature = featureToRef("bb.feature.audit-log");
+const hasAuditLogFeature = featureToRef(PlanFeature.FEATURE_AUDIT_LOG);
 const auditLogPagedTable = ref<ComponentExposed<typeof PagedTable<AuditLog>>>();
 const auditLogStore = useAuditLogStore();
 
@@ -116,7 +122,7 @@ const fetchAuditLog = async ({
     pageToken,
     pageSize,
   });
-  await batchGetOrFetchUsers(auditLogs.map((log) => log.user));
+  await useUserStore().batchGetUsers(auditLogs.map((log) => log.user));
   return { nextPageToken, list: auditLogs };
 };
 
@@ -142,32 +148,37 @@ const disableExportTip = computed(() => {
   return "";
 });
 
-const handleExport = async (
-  options: ExportOption,
-  callback: (content: BinaryLike | Blob, filename: string) => void
-) => {
+const handleExport = async ({
+  options,
+  resolve,
+  reject,
+}: {
+  options: ExportOption;
+  reject: (reason?: any) => void;
+  resolve: (content: DownloadContent) => void;
+}) => {
   let pageToken = "";
   let i = 0;
+  const contents: DownloadContent = [];
 
-  while (i === 0 || pageToken !== "") {
-    i++;
-    const { content, nextPageToken } = await auditLogStore.exportAuditLogs({
-      search: searchAuditLogs.value,
-      format: options.format,
-      pageSize: 10000,
-    });
-    pageToken = nextPageToken;
-    callback(
-      content,
-      `audit-log${!pageToken && i === 1 ? "" : `.file${i}`}.${dayjs(new Date()).format("YYYY-MM-DDTHH-mm-ss")}`
-    );
+  try {
+    while (i === 0 || pageToken !== "") {
+      i++;
+      const { content, nextPageToken } = await auditLogStore.exportAuditLogs({
+        search: searchAuditLogs.value,
+        format: options.format,
+        pageSize: 10000,
+        pageToken,
+      });
+      pageToken = nextPageToken;
+      contents.push({
+        content,
+        filename: `audit-log.file${i}.${dayjs(new Date()).format("YYYY-MM-DDTHH-mm-ss")}`,
+      });
+    }
+    resolve(contents);
+  } catch (err) {
+    reject(err);
   }
-
-  pushNotification({
-    module: "bytebase",
-    style: "SUCCESS",
-    title: t("common.success"),
-    description: t("audit-log.export-finished"),
-  });
 };
 </script>

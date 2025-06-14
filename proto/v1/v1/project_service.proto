@@ -12,9 +12,11 @@ import "v1/annotation.proto";
 import "v1/common.proto";
 import "v1/iam_policy.proto";
 
-option go_package = "generated-go/v1";
+option go_package = "github.com/bytebase/bytebase/proto/generated-go/v1";
 
 service ProjectService {
+  // GetProject retrieves a project by name.
+  // Users with "bb.projects.get" permission on the workspace or the project owner can access this method.
   rpc GetProject(GetProjectRequest) returns (Project) {
     option (google.api.http) = {get: "/v1/{name=projects/*}"};
     option (google.api.method_signature) = "name";
@@ -181,11 +183,13 @@ message SearchProjectsRequest {
   bool show_deleted = 1;
 
   // Filter the project.
+  // The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+  //
   // Supported filters:
-  // - name
-  // - resource_id
-  // - exclude_default: if not include the default project.
-  // - state
+  // - name: the project name, support "==" and ".matches()" operator.
+  // - resource_id: the project id, support "==" and ".matches()" operator.
+  // - exclude_default: if not include the default project, should be "true" or "false", support "==" operator.
+  // - state: check the State enum for the values, support "==" operator.
   //
   // For example:
   // name = "project name"
@@ -343,6 +347,9 @@ message Project {
   // The maximum databases of rows to sample during CI data validation.
   // Without specification, sampling is disabled, resulting in a full validation.
   int32 ci_sampling_size = 23;
+
+  // The maximum number of parallel tasks to run during the rollout.
+  int32 parallel_tasks_per_rollout = 24;
 }
 
 message AddWebhookRequest {
@@ -457,39 +464,7 @@ message Activity {
     TYPE_ISSUE_APPROVAL_NOTIFY = 21;
     // TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE represents the pipeline stage status change, including BEGIN, END for now.
     TYPE_ISSUE_PIPELINE_STAGE_STATUS_UPDATE = 5;
-    // TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE represents the pipeline task status change, including PENDING, PENDING_APPROVAL, RUNNING, SUCCESS, FAILURE, CANCELED for now.
-    TYPE_ISSUE_PIPELINE_TASK_STATUS_UPDATE = 6;
     // TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE represents the pipeline task run status change, including PENDING, RUNNING, DONE, FAILED, CANCELED.
     TYPE_ISSUE_PIPELINE_TASK_RUN_STATUS_UPDATE = 22;
-    // TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE represents the manual update of the task statement.
-    TYPE_ISSUE_PIPELINE_TASK_STATEMENT_UPDATE = 8;
-    // TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE represents the manual update of the task earliest allowed time.
-    TYPE_ISSUE_PIPELINE_TASK_EARLIEST_ALLOWED_TIME_UPDATE = 9;
-
-    // Member related activity types.
-    //
-    // TYPE_MEMBER_CREATE represents creating a members.
-    TYPE_MEMBER_CREATE = 10;
-    // TYPE_MEMBER_ROLE_UPDATE represents updating the member role, for example, from ADMIN to MEMBER.
-    TYPE_MEMBER_ROLE_UPDATE = 11;
-    // TYPE_MEMBER_ACTIVATE represents activating a deactivated member.
-    TYPE_MEMBER_ACTIVATE = 12;
-    // TYPE_MEMBER_DEACTIVATE represents deactivating an active member.
-    TYPE_MEMBER_DEACTIVATE = 13;
-
-    // Project related activity types.
-    //
-    // TYPE_PROJECT_REPOSITORY_PUSH represents Bytebase receiving a push event from the project repository.
-    TYPE_PROJECT_REPOSITORY_PUSH = 14;
-    // TYPE_PROJECT_DATABASE_TRANFER represents transfering the database from one project to another.
-    TYPE_PROJECT_DATABASE_TRANSFER = 15;
-    // TYPE_PROJECT_MEMBER_CREATE represents adding a member to the project.
-    TYPE_PROJECT_MEMBER_CREATE = 16;
-    // TYPE_PROJECT_MEMBER_DELETE represents removing a member from the project.
-    TYPE_PROJECT_MEMBER_DELETE = 17;
-
-    // SQL Editor related activity types.
-    // TYPE_SQL_EDITOR_QUERY represents executing query in SQL Editor.
-    TYPE_SQL_EDITOR_QUERY = 19;
   }
 }

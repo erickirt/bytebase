@@ -11,7 +11,7 @@
               <div class="text-sm font-medium">{{ $t("common.type") }}</div>
               <a
                 v-if="!hideServiceAccount"
-                href="https://www.bytebase.com/docs/get-started/terraform?source=console"
+                href="https://docs.bytebase.com/get-started/terraform?source=console"
                 target="_blank"
               >
                 <heroicons-outline:question-mark-circle class="w-4 h-4" />
@@ -64,9 +64,6 @@
               <label class="block text-sm font-medium leading-5 text-control">
                 {{ $t("settings.members.table.roles") }}
               </label>
-              <span class="textinfolabel text-sm">
-                {{ $t("role.default-workspace-role") }}
-              </span>
             </div>
             <RoleSelect v-model:value="state.roles" :multiple="true" />
           </div>
@@ -134,7 +131,7 @@ import {
   useUserStore,
   useWorkspaceV1Store,
 } from "@/store";
-import { emptyUser } from "@/types";
+import { emptyUser, PresetRoleType } from "@/types";
 import { UserType, User } from "@/types/proto/v1/user_service";
 import UserPassword from "./UserPassword.vue";
 
@@ -164,7 +161,7 @@ const hideServiceAccount = useAppFeature(
 const state = reactive<LocalState>({
   isRequesting: false,
   user: emptyUser(),
-  roles: [],
+  roles: [PresetRoleType.WORKSPACE_MEMBER],
   passwordConfirm: "",
 });
 

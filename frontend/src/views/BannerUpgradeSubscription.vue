@@ -16,7 +16,7 @@
                 >{{
                   t("subscription.plan-features", {
                     plan: t(
-                      `subscription.plan.${planTypeToString(neededPlan)}.title`
+                      `subscription.plan.${neededPlan.toLowerCase()}.title`
                     ),
                   })
                 }}</span
@@ -50,13 +50,13 @@
       <ul class="list-disc list-inside">
         <li v-for="feature in unlicensedFeatures" :key="feature">
           {{
-            $t(`dynamic.subscription.features.${feature.split(".").join("-")}.title`)
+            $t(`dynamic.subscription.features.${feature}.title`)
           }}
           ({{
             $t(
-              `subscription.plan.${planTypeToString(
-                subscriptionStore.getMinimumRequiredPlan(feature as FeatureType)
-              )}.title`
+              `subscription.plan.${
+                subscriptionStore.getMinimumRequiredPlan(feature as PlanFeature).toLowerCase()
+              }.title`
             )
           }})
         </li>
@@ -71,20 +71,17 @@
 </template>
 
 <script lang="ts" setup>
-import { NButton } from "naive-ui";
-import { reactive } from "vue";
-import { computed } from "vue";
-import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import { BBModal } from "@/bbkit";
 import { SETTING_ROUTE_WORKSPACE_SUBSCRIPTION } from "@/router/dashboard/workspaceSetting";
-import { useSubscriptionV1Store, useActuatorV1Store } from "@/store";
-import type { FeatureType } from "@/types";
-import { planTypeToString } from "@/types";
+import { useActuatorV1Store, useSubscriptionV1Store } from "@/store";
 import {
-  PlanType,
-  planTypeToNumber,
+  PlanFeature, PlanType,
+  planTypeToNumber
 } from "@/types/proto/v1/subscription_service";
+import { NButton } from "naive-ui";
+import { computed, reactive } from "vue";
+import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 
 interface LocalState {
   showModal: boolean;
@@ -115,7 +112,7 @@ const neededPlan = computed(() => {
 
   for (const feature of unlicensedFeatures.value) {
     const requiredPlan = subscriptionStore.getMinimumRequiredPlan(
-      feature as FeatureType
+      feature as PlanFeature
     );
     if (planTypeToNumber(requiredPlan) > planTypeToNumber(plan)) {
       plan = requiredPlan;
@@ -127,7 +124,7 @@ const neededPlan = computed(() => {
 
 const currentPlan = computed(() => {
   return t(
-    `subscription.plan.${planTypeToString(subscriptionStore.currentPlan)}.title`
+    `subscription.plan.${subscriptionStore.currentPlan.toLowerCase()}.title`
   );
 });
 

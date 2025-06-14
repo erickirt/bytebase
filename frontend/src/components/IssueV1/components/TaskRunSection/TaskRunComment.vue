@@ -29,17 +29,20 @@ import { last } from "lodash-es";
 import { NEllipsis } from "naive-ui";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { databaseForTask } from "@/components/Rollout/RolloutDetail";
+import { useCurrentProjectV1 } from "@/store";
 import { getProjectIdRolloutUidStageUidTaskUid } from "@/store/modules/v1/common";
 import {
   unknownTask,
   isPostgresFamily,
   type ComposedTaskRun,
   getTimeForPbTimestamp,
+  getDateForPbTimestamp,
 } from "@/types";
 import { TaskRun_Status, Task_Type } from "@/types/proto/v1/rollout_service";
 import { databaseV1Url, extractTaskUID, flattenTaskV1List } from "@/utils";
 import { extractChangelogUID } from "@/utils/v1/changelog";
-import { databaseForTask, specForTask, useIssueContext } from "../../logic";
+import { useIssueContext } from "../../logic";
 import { displayTaskRunLogEntryType } from "./TaskRunLogTable/common";
 
 export type CommentLink = {
@@ -52,21 +55,12 @@ const props = defineProps<{
 }>();
 
 const { issue } = useIssueContext();
+const { project } = useCurrentProjectV1();
 const { t } = useI18n();
 
-const task = computed(() => {
-  const taskUID = extractTaskUID(props.taskRun.name);
-  const task =
-    flattenTaskV1List(issue.value.rolloutEntity).find(
-      (task) => extractTaskUID(task.name) === taskUID
-    ) ?? unknownTask();
-  return task;
-});
-
 const earliestAllowedTime = computed(() => {
-  const spec = specForTask(issue.value.planEntity, task.value);
-  return spec?.earliestAllowedTime
-    ? getTimeForPbTimestamp(spec.earliestAllowedTime)
+  return props.taskRun.runTime
+    ? getTimeForPbTimestamp(props.taskRun.runTime)
     : null;
 });
 
@@ -81,7 +75,11 @@ const comment = computed(() => {
     if (taskRun.schedulerInfo) {
       const cause = taskRun.schedulerInfo.waitingCause;
       if (cause?.task) {
-        return t("task-run.status.waiting-task");
+        return t("task-run.status.waiting-task", {
+          time: getDateForPbTimestamp(
+            taskRun.schedulerInfo.reportTime
+          )?.toLocaleString(),
+        });
       }
     }
     return t("task-run.status.enqueued");
@@ -89,20 +87,34 @@ const comment = computed(() => {
     if (taskRun.schedulerInfo) {
       const cause = taskRun.schedulerInfo.waitingCause;
       if (cause?.connectionLimit) {
-        return t("task-run.status.waiting-connection");
+        return t("task-run.status.waiting-connection", {
+          time: getDateForPbTimestamp(
+            taskRun.schedulerInfo.reportTime
+          )?.toLocaleString(),
+        });
       }
       if (cause?.task) {
-        return t("task-run.status.waiting-task");
+        return t("task-run.status.waiting-task", {
+          time: getDateForPbTimestamp(
+            taskRun.schedulerInfo.reportTime
+          )?.toLocaleString(),
+        });
+      }
+      if (cause?.parallelTasksLimit) {
+        return t("task-run.status.waiting-max-tasks-per-rollout", {
+          time: getDateForPbTimestamp(
+            taskRun.schedulerInfo.reportTime
+          )?.toLocaleString(),
+        });
       }
     }
 
     const lastLogEntry = last(taskRun.taskRunLog.entries);
-    if (!lastLogEntry) {
-      return "-";
+    if (lastLogEntry) {
+      return displayTaskRunLogEntryType(lastLogEntry.type);
     }
-    return displayTaskRunLogEntryType(lastLogEntry.type);
   }
-  return taskRun.detail;
+  return taskRun.detail || "-";
 });
 
 const commentLink = computed((): CommentLink => {
@@ -132,7 +144,6 @@ const commentLink = computed((): CommentLink => {
     }
   } else if (taskRun.status === TaskRun_Status.DONE) {
     switch (task.type) {
-      case Task_Type.DATABASE_SCHEMA_BASELINE:
       case Task_Type.DATABASE_SCHEMA_UPDATE:
       case Task_Type.DATABASE_SCHEMA_UPDATE_SDL:
       case Task_Type.DATABASE_SCHEMA_UPDATE_GHOST:
@@ -143,7 +154,7 @@ const commentLink = computed((): CommentLink => {
             link: "",
           };
         }
-        const db = databaseForTask(issue.value, task);
+        const db = databaseForTask(project.value, task);
         const link = `${databaseV1Url(
           db
         )}/changelogs/${extractChangelogUID(taskRun.changelog)}`;
@@ -154,17 +165,17 @@ const commentLink = computed((): CommentLink => {
       }
     }
   } else if (taskRun.status === TaskRun_Status.FAILED) {
-    const db = databaseForTask(issue.value, task);
+    const db = databaseForTask(project.value, task);
     // Cast a wide net to catch migration version error
     if (comment.value.includes("version")) {
       return {
         title: t("common.troubleshoot"),
-        link: "https://www.bytebase.com/docs/change-database/troubleshoot/?source=console#duplicate-version",
+        link: "https://docs.bytebase.com/change-database/troubleshoot/?source=console#duplicate-version",
       };
     } else if (isPostgresFamily(db.instanceResource.engine)) {
       return {
         title: t("common.troubleshoot"),
-        link: "https://www.bytebase.com/docs/change-database/troubleshoot/?source=console#postgresql",
+        link: "https://docs.bytebase.com/change-database/troubleshoot/?source=console#postgresql",
       };
     }
   }

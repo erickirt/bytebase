@@ -1,72 +1,90 @@
-import { NButton } from "naive-ui";
-import { h } from "vue";
 import { t } from "@/plugins/i18n";
 import {
-  pushNotification,
   useDatabaseV1Store,
   useEnvironmentV1Store,
   useInstanceResourceByName,
+  useProjectV1Store,
 } from "@/store";
 import type { ComposedDatabase, ComposedIssue, ComposedProject } from "@/types";
 import {
+  isValidDatabaseName,
+  isValidInstanceName,
   unknownDatabase,
   unknownEnvironment,
-  isValidDatabaseName,
+  unknownInstance,
 } from "@/types";
-import { InstanceResource } from "@/types/proto/v1/instance_service";
+import { State } from "@/types/proto/v1/common";
 import { IssueStatus } from "@/types/proto/v1/issue_service";
 import type { Plan } from "@/types/proto/v1/plan_service";
 import { Task, Task_Status, Task_Type } from "@/types/proto/v1/rollout_service";
 import {
   defer,
   extractDatabaseResourceName,
-  flattenSpecList,
   flattenTaskV1List,
   isValidIssueName,
 } from "@/utils";
+import { NButton } from "naive-ui";
+import { h } from "vue";
 import type { IssueContext } from "./context";
 
-export const databaseForTask = (issue: ComposedIssue, task: Task) => {
-  if (task.type === Task_Type.DATABASE_CREATE) {
-    // The database is not created yet.
-    // extract database info from the task's and payload's properties.
-    return extractCoreDatabaseInfoFromDatabaseCreateTask(
-      issue.projectEntity,
-      task
-    );
-  } else {
-    if (
-      task.databaseDataUpdate ||
-      task.databaseSchemaUpdate ||
-      task.databaseDataExport ||
-      task.type === Task_Type.DATABASE_SCHEMA_BASELINE
-    ) {
-      const db = useDatabaseV1Store().getDatabaseByName(task.target);
-      if (!isValidDatabaseName(db.name)) {
-        // Database not found, it's probably NOT_FOUND (maybe dropped actually)
-        // Mock a database using all known resources
-        db.project = issue.project;
-        db.projectEntity = issue.projectEntity;
+export const projectOfIssue = (issue: ComposedIssue): ComposedProject =>
+  useProjectV1Store().getProjectByName(issue.project);
 
-        db.name = task.target;
-        const { instance, databaseName } = extractDatabaseResourceName(db.name);
-        db.databaseName = databaseName;
-        db.instance = instance;
-        db.instanceResource = InstanceResource.fromPartial({
-          ...db.instanceResource,
-          name: instance,
-        });
-        db.environment = db.instanceResource.environment;
-        db.effectiveEnvironment = db.instanceResource.environment;
-        db.effectiveEnvironmentEntity =
-          useEnvironmentV1Store().getEnvironmentByName(
-            db.instanceResource.environment
-          ) ?? unknownEnvironment();
-      }
-      return db;
-    }
+export const useInstanceForTask = (task: Task) => {
+  let instanceName: string = "";
+  switch (task.type) {
+    case Task_Type.DATABASE_CREATE:
+      instanceName = task.target;
+      break;
+    case Task_Type.DATABASE_SCHEMA_UPDATE:
+    case Task_Type.DATABASE_SCHEMA_UPDATE_SDL:
+    case Task_Type.DATABASE_SCHEMA_UPDATE_GHOST:
+    case Task_Type.DATABASE_DATA_UPDATE:
+    case Task_Type.DATABASE_EXPORT:
+      instanceName = extractDatabaseResourceName(task.target).instance;
+      break;
+    default:
   }
-  return unknownDatabase();
+
+  if (!isValidInstanceName(instanceName)) {
+    return {
+      instance: {
+        ...unknownInstance(),
+        name: instanceName,
+      },
+      ready: true,
+    };
+  }
+
+  return useInstanceResourceByName(instanceName);
+};
+
+export const mockDatabase = (
+  projectEntity: ComposedProject,
+  database: string
+) => {
+  // Database not found, it's probably NOT_FOUND (maybe dropped actually)
+  // Mock a database using all known resources
+  const db = unknownDatabase();
+  db.project = projectEntity.name;
+
+  db.name = database;
+  const { instance, databaseName } = extractDatabaseResourceName(db.name);
+  db.databaseName = databaseName;
+  db.instance = instance;
+  db.instanceResource = {
+    ...db.instanceResource,
+    ...useInstanceResourceByName(instance).instance.value,
+    name: instance,
+  };
+  db.environment = db.instanceResource.environment;
+  db.effectiveEnvironment = db.instanceResource.environment;
+  db.effectiveEnvironmentEntity =
+    useEnvironmentV1Store().getEnvironmentByName(
+      db.instanceResource.environment
+    ) ?? unknownEnvironment();
+  db.state = State.DELETED;
+  return db;
 };
 
 export const extractCoreDatabaseInfoFromDatabaseCreateTask = (
@@ -111,7 +129,7 @@ export const extractCoreDatabaseInfoFromDatabaseCreateTask = (
 
 export const specForTask = (plan: Plan | undefined, task: Task) => {
   if (!plan) return undefined;
-  return flattenSpecList(plan).find((spec) => spec.id === task.specId);
+  return (plan.specs || []).find((spec) => spec.id === task.specId);
 };
 
 export const stageForTask = (issue: ComposedIssue, task: Task) => {
@@ -119,14 +137,6 @@ export const stageForTask = (issue: ComposedIssue, task: Task) => {
   return rollout?.stages.find(
     (stage) => stage.tasks.findIndex((t) => t.name === task.name) >= 0
   );
-};
-
-export const notifyNotEditableLegacyIssue = () => {
-  pushNotification({
-    module: "bytebase",
-    style: "CRITICAL",
-    title: t("issue.not-editable-legacy-issue"),
-  });
 };
 
 export const chooseUpdateTarget = (

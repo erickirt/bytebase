@@ -30,7 +30,7 @@
     <div :class="['w-full space-y-2', memberType !== 'USERS' ? 'hidden' : '']">
       <div class="flex text-main items-center gap-x-1">
         {{ $t("settings.members.select-user", 2 /* multiply*/) }}
-        <span v-if="required" class="text-red-600">*</span>
+        <RequiredStar v-if="required" />
       </div>
       <UserSelect
         key="user-select"
@@ -46,7 +46,7 @@
     <div :class="['w-full space-y-2', memberType !== 'GROUPS' ? 'hidden' : '']">
       <div class="flex font-medium text-main items-center gap-x-1">
         {{ $t("settings.members.select-group", 2 /* multiply*/) }}
-        <span v-if="required" class="text-red-600">*</span>
+        <RequiredStar v-if="required" />
       </div>
 
       <GroupSelect
@@ -65,12 +65,12 @@
 import { uniq } from "lodash-es";
 import { NRadio, NRadioGroup } from "naive-ui";
 import { computed, ref, onMounted, watchEffect } from "vue";
+import RequiredStar from "@/components/RequiredStar.vue";
 import { GroupSelect, UserSelect } from "@/components/v2";
 import {
   extractGroupEmail,
   useUserStore,
   useGroupStore,
-  batchGetOrFetchUsers,
   extractUserId,
 } from "@/store";
 import { groupNamePrefix } from "@/store/modules/v1/common";
@@ -119,7 +119,7 @@ onMounted(() => {
 });
 
 watchEffect(async () => {
-  await batchGetOrFetchUsers(
+  await userStore.batchGetUsers(
     props.value.map((binding) =>
       binding.startsWith(groupBindingPrefix) ? "" : binding
     )

@@ -12,8 +12,7 @@ import (
 	"github.com/bytebase/bytebase/backend/component/dbfactory"
 	"github.com/bytebase/bytebase/backend/component/sheet"
 
-	"github.com/bytebase/bytebase/backend/base"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	"github.com/bytebase/bytebase/backend/plugin/advisor"
 	"github.com/bytebase/bytebase/backend/plugin/advisor/catalog"
 	"github.com/bytebase/bytebase/backend/plugin/db"
@@ -28,7 +27,7 @@ func NewStatementAdviseExecutor(
 	store *store.Store,
 	sheetManager *sheet.Manager,
 	dbFactory *dbfactory.DBFactory,
-	licenseService enterprise.LicenseService,
+	licenseService *enterprise.LicenseService,
 ) Executor {
 	return &StatementAdviseExecutor{
 		store:          store,
@@ -43,29 +42,13 @@ type StatementAdviseExecutor struct {
 	store          *store.Store
 	sheetManager   *sheet.Manager
 	dbFactory      *dbfactory.DBFactory
-	licenseService enterprise.LicenseService
+	licenseService *enterprise.LicenseService
 }
 
 // Run will run the plan check statement advise executor once, and run its sub-advisors one-by-one.
 func (e *StatementAdviseExecutor) Run(ctx context.Context, config *storepb.PlanCheckRunConfig) ([]*storepb.PlanCheckRunResult_Result, error) {
 	if config.ChangeDatabaseType == storepb.PlanCheckRunConfig_CHANGE_DATABASE_TYPE_UNSPECIFIED {
 		return nil, errors.Errorf("change database type is unspecified")
-	}
-	if err := e.licenseService.IsFeatureEnabled(base.FeatureSQLReview); err != nil {
-		// nolint:nilerr
-		return []*storepb.PlanCheckRunResult_Result{
-			{
-				Status:  storepb.PlanCheckRunResult_Result_WARNING,
-				Code:    advisor.Unsupported.Int32(),
-				Title:   "SQL review is disabled",
-				Content: err.Error(),
-				Report: &storepb.PlanCheckRunResult_Result_SqlReviewReport_{
-					SqlReviewReport: &storepb.PlanCheckRunResult_Result_SqlReviewReport{
-						Line: 0,
-					},
-				},
-			},
-		}, nil
 	}
 
 	sheetUID := int(config.SheetUid)
@@ -91,7 +74,7 @@ func (e *StatementAdviseExecutor) Run(ctx context.Context, config *storepb.PlanC
 		return nil, err
 	}
 	changeType := config.ChangeDatabaseType
-	preUpdateBackupDetail := config.PreUpdateBackupDetail
+	enablePriorBackup := config.EnablePriorBackup
 
 	instance, err := e.store.GetInstanceV2(ctx, &store.FindInstanceMessage{ResourceID: &config.InstanceId})
 	if err != nil {
@@ -100,7 +83,7 @@ func (e *StatementAdviseExecutor) Run(ctx context.Context, config *storepb.PlanC
 	if instance == nil {
 		return nil, errors.Errorf("instance %s not found", config.InstanceId)
 	}
-	if !base.EngineSupportStatementAdvise(instance.Metadata.GetEngine()) {
+	if !common.EngineSupportStatementAdvise(instance.Metadata.GetEngine()) {
 		return []*storepb.PlanCheckRunResult_Result{
 			{
 				Status:  storepb.PlanCheckRunResult_Result_SUCCESS,
@@ -119,7 +102,7 @@ func (e *StatementAdviseExecutor) Run(ctx context.Context, config *storepb.PlanC
 		return nil, errors.Errorf("database not found %q", config.DatabaseName)
 	}
 
-	results, err := e.runReview(ctx, instance, database, changeType, statement, preUpdateBackupDetail)
+	results, err := e.runReview(ctx, instance, database, changeType, statement, enablePriorBackup)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +127,7 @@ func (e *StatementAdviseExecutor) runReview(
 	database *store.DatabaseMessage,
 	changeType storepb.PlanCheckRunConfig_ChangeDatabaseType,
 	statement string,
-	preUpdateBackupDetail *storepb.PreUpdateBackupDetail,
+	enablePriorBackup bool,
 ) ([]*storepb.PlanCheckRunResult_Result, error) {
 	dbSchema, err := e.store.GetDBSchema(ctx, database.InstanceID, database.DatabaseName)
 	if err != nil {
@@ -199,7 +182,7 @@ func (e *StatementAdviseExecutor) runReview(
 		DBType:                   instance.Metadata.GetEngine(),
 		Catalog:                  catalog,
 		Driver:                   connection,
-		PreUpdateBackupDetail:    preUpdateBackupDetail,
+		EnablePriorBackup:        enablePriorBackup,
 		ClassificationConfig:     classificationConfig,
 		UsePostgresDatabaseOwner: useDatabaseOwner,
 		ListDatabaseNamesFunc:    e.buildListDatabaseNamesFunc(),

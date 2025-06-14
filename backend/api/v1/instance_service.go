@@ -16,14 +16,13 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/component/dbfactory"
 	"github.com/bytebase/bytebase/backend/component/iam"
 	"github.com/bytebase/bytebase/backend/component/secret"
 	"github.com/bytebase/bytebase/backend/component/state"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	metricapi "github.com/bytebase/bytebase/backend/metric"
 	"github.com/bytebase/bytebase/backend/plugin/db"
 	"github.com/bytebase/bytebase/backend/plugin/metric"
@@ -38,7 +37,7 @@ import (
 type InstanceService struct {
 	v1pb.UnimplementedInstanceServiceServer
 	store          *store.Store
-	licenseService enterprise.LicenseService
+	licenseService *enterprise.LicenseService
 	metricReporter *metricreport.Reporter
 	stateCfg       *state.State
 	dbFactory      *dbfactory.DBFactory
@@ -47,7 +46,7 @@ type InstanceService struct {
 }
 
 // NewInstanceService creates a new InstanceService.
-func NewInstanceService(store *store.Store, licenseService enterprise.LicenseService, metricReporter *metricreport.Reporter, stateCfg *state.State, dbFactory *dbfactory.DBFactory, schemaSyncer *schemasync.Syncer, iamManager *iam.Manager) *InstanceService {
+func NewInstanceService(store *store.Store, licenseService *enterprise.LicenseService, metricReporter *metricreport.Reporter, stateCfg *state.State, dbFactory *dbfactory.DBFactory, schemaSyncer *schemasync.Syncer, iamManager *iam.Manager) *InstanceService {
 	return &InstanceService{
 		store:          store,
 		licenseService: licenseService,
@@ -155,12 +154,17 @@ func parseListInstanceFilter(filter string) (*store.ListResourceFilter, error) {
 				if !ok {
 					return "", status.Errorf(codes.InvalidArgument, "expect string, got %T, hint: filter literals should be string", value)
 				}
+				if strValue == "" {
+					return "", status.Errorf(codes.InvalidArgument, `empty value for %q`, variable)
+				}
 
 				switch variable {
 				case "name":
 					return "LOWER(instance.metadata->>'title') LIKE '%" + strings.ToLower(strValue) + "%'", nil
 				case "resource_id":
 					return "LOWER(instance.resource_id) LIKE '%" + strings.ToLower(strValue) + "%'", nil
+				case "host", "port":
+					return "ds ->> '" + variable + "' LIKE '%" + strValue + "%'", nil
 				default:
 					return "", status.Errorf(codes.InvalidArgument, "unsupport variable %q", variable)
 				}
@@ -317,14 +321,14 @@ func (s *InstanceService) CreateInstance(ctx context.Context, request *v1pb.Crea
 		return convertInstanceMessage(instanceMessage)
 	}
 
-	instanceCountLimit := s.licenseService.GetInstanceLicenseCount(ctx)
+	activatedInstanceLimit := s.licenseService.GetActivatedInstanceLimit(ctx)
 	if instanceMessage.Metadata.GetActivation() {
 		count, err := s.store.GetActivatedInstanceCount(ctx)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-		if count >= instanceCountLimit {
-			return nil, status.Errorf(codes.ResourceExhausted, instanceExceededError, instanceCountLimit)
+		if count >= activatedInstanceLimit {
+			return nil, status.Errorf(codes.ResourceExhausted, instanceExceededError, activatedInstanceLimit)
 		}
 	}
 
@@ -378,14 +382,14 @@ func (s *InstanceService) checkInstanceDataSources(instance *store.InstanceMessa
 	return nil
 }
 
-var instanceExceededError = "activation instance count has reached the limit (%v)"
+const instanceExceededError = "activation instance count has reached the limit (%v)"
 
 func (s *InstanceService) checkDataSource(instance *store.InstanceMessage, dataSource *storepb.DataSource) error {
 	if dataSource.GetId() == "" {
 		return status.Errorf(codes.InvalidArgument, "data source id is required")
 	}
 
-	if err := s.licenseService.IsFeatureEnabledForInstance(base.FeatureExternalSecretManager, instance); err != nil {
+	if err := s.licenseService.IsFeatureEnabledForInstance(v1pb.PlanFeature_FEATURE_EXTERNAL_SECRET_MANAGER, instance); err != nil {
 		missingFeatureError := status.Error(codes.PermissionDenied, err.Error())
 		if dataSource.GetExternalSecret() != nil {
 			return missingFeatureError
@@ -459,33 +463,30 @@ func (s *InstanceService) UpdateInstance(ctx context.Context, request *v1pb.Upda
 			}
 			patch.Metadata.Activation = request.Instance.Activation
 		case "sync_interval":
-			if err := s.licenseService.IsFeatureEnabledForInstance(base.FeatureCustomInstanceSynchronization, instance); err != nil {
+			if err := s.licenseService.IsFeatureEnabledForInstance(v1pb.PlanFeature_FEATURE_CUSTOM_INSTANCE_SYNC_TIME, instance); err != nil {
 				return nil, status.Error(codes.PermissionDenied, err.Error())
 			}
 			patch.Metadata.SyncInterval = request.Instance.SyncInterval
 		case "maximum_connections":
-			if err := s.licenseService.IsFeatureEnabledForInstance(base.FeatureCustomInstanceSynchronization, instance); err != nil {
+			if err := s.licenseService.IsFeatureEnabledForInstance(v1pb.PlanFeature_FEATURE_CUSTOM_INSTANCE_CONNECTION_LIMIT, instance); err != nil {
 				return nil, status.Error(codes.PermissionDenied, err.Error())
 			}
 			patch.Metadata.MaximumConnections = request.Instance.MaximumConnections
 		case "sync_databases":
-			if err := s.licenseService.IsFeatureEnabledForInstance(base.FeatureCustomInstanceSynchronization, instance); err != nil {
-				return nil, status.Error(codes.PermissionDenied, err.Error())
-			}
 			patch.Metadata.SyncDatabases = request.Instance.SyncDatabases
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, `unsupported update_mask "%s"`, path)
 		}
 	}
 
-	instanceCountLimit := s.licenseService.GetInstanceLicenseCount(ctx)
+	activatedInstanceLimit := s.licenseService.GetActivatedInstanceLimit(ctx)
 	if updateActivation {
 		count, err := s.store.GetActivatedInstanceCount(ctx)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-		if count >= instanceCountLimit {
-			return nil, status.Errorf(codes.ResourceExhausted, instanceExceededError, instanceCountLimit)
+		if count >= activatedInstanceLimit {
+			return nil, status.Errorf(codes.ResourceExhausted, instanceExceededError, activatedInstanceLimit)
 		}
 	}
 
@@ -512,15 +513,15 @@ func (s *InstanceService) DeleteInstance(ctx context.Context, request *v1pb.Dele
 	}
 	if request.Force {
 		if len(databases) > 0 {
-			defaultProjectID := base.DefaultProjectID
+			defaultProjectID := common.DefaultProjectID
 			if _, err := s.store.BatchUpdateDatabases(ctx, databases, &store.BatchUpdateDatabases{ProjectID: &defaultProjectID}); err != nil {
-				return nil, err
+				return nil, status.Error(codes.Internal, err.Error())
 			}
 		}
 	} else {
 		var databaseNames []string
 		for _, database := range databases {
-			if database.ProjectID != base.DefaultProjectID {
+			if database.ProjectID != common.DefaultProjectID {
 				databaseNames = append(databaseNames, database.DatabaseName)
 			}
 		}
@@ -594,7 +595,7 @@ func (s *InstanceService) SyncInstance(ctx context.Context, request *v1pb.SyncIn
 	return response, nil
 }
 
-// SyncInstance syncs the instance.
+// BatchSyncInstances syncs multiple instances.
 func (s *InstanceService) BatchSyncInstances(ctx context.Context, request *v1pb.BatchSyncInstancesRequest) (*v1pb.BatchSyncInstancesResponse, error) {
 	for _, r := range request.Requests {
 		instance, err := getInstanceMessage(ctx, s.store, r.Name)
@@ -618,6 +619,19 @@ func (s *InstanceService) BatchSyncInstances(ctx context.Context, request *v1pb.
 	}
 
 	return &v1pb.BatchSyncInstancesResponse{}, nil
+}
+
+// BatchUpdateInstances update multiple instances.
+func (s *InstanceService) BatchUpdateInstances(ctx context.Context, request *v1pb.BatchUpdateInstancesRequest) (*v1pb.BatchUpdateInstancesResponse, error) {
+	response := &v1pb.BatchUpdateInstancesResponse{}
+	for _, req := range request.GetRequests() {
+		updated, err := s.UpdateInstance(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		response.Instances = append(response.Instances, updated)
+	}
+	return response, nil
 }
 
 // AddDataSource adds a data source to an instance.
@@ -678,7 +692,7 @@ func (s *InstanceService) AddDataSource(ctx context.Context, request *v1pb.AddDa
 	if dataSource.GetType() != storepb.DataSourceType_READ_ONLY {
 		return nil, status.Error(codes.InvalidArgument, "only read-only data source can be added.")
 	}
-	if err := s.licenseService.IsFeatureEnabledForInstance(base.FeatureReadReplicaConnection, instance); err != nil {
+	if err := s.licenseService.IsFeatureEnabledForInstance(v1pb.PlanFeature_FEATURE_INSTANCE_READ_ONLY_CONNECTION, instance); err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 
@@ -727,12 +741,11 @@ func (s *InstanceService) UpdateDataSource(ctx context.Context, request *v1pb.Up
 	}
 
 	if dataSource.GetType() == storepb.DataSourceType_READ_ONLY {
-		if err := s.licenseService.IsFeatureEnabledForInstance(base.FeatureReadReplicaConnection, instance); err != nil {
+		if err := s.licenseService.IsFeatureEnabledForInstance(v1pb.PlanFeature_FEATURE_INSTANCE_READ_ONLY_CONNECTION, instance); err != nil {
 			return nil, status.Error(codes.PermissionDenied, err.Error())
 		}
 	}
 
-	hasSSH := false
 	for _, path := range request.UpdateMask.Paths {
 		switch path {
 		case "username":
@@ -761,19 +774,14 @@ func (s *InstanceService) UpdateDataSource(ctx context.Context, request *v1pb.Up
 			dataSource.ServiceName = request.DataSource.ServiceName
 		case "ssh_host":
 			dataSource.SshHost = request.DataSource.SshHost
-			hasSSH = true
 		case "ssh_port":
 			dataSource.SshPort = request.DataSource.SshPort
-			hasSSH = true
 		case "ssh_user":
 			dataSource.SshUser = request.DataSource.SshUser
-			hasSSH = true
 		case "ssh_password":
 			dataSource.SshPassword = request.DataSource.SshPassword
-			hasSSH = true
 		case "ssh_private_key":
 			dataSource.SshPrivateKey = request.DataSource.SshPrivateKey
-			hasSSH = true
 		case "authentication_private_key":
 			dataSource.AuthenticationPrivateKey = request.DataSource.AuthenticationPrivateKey
 		case "external_secret":
@@ -828,11 +836,6 @@ func (s *InstanceService) UpdateDataSource(ctx context.Context, request *v1pb.Up
 
 	if err := s.checkDataSource(instance, dataSource); err != nil {
 		return nil, err
-	}
-	if hasSSH {
-		if err := s.licenseService.IsFeatureEnabledForInstance(base.FeatureInstanceSSHConnection, instance); err != nil {
-			return nil, status.Error(codes.PermissionDenied, err.Error())
-		}
 	}
 
 	// Test connection.
@@ -1138,6 +1141,9 @@ func convertDataSources(dataSources []*storepb.DataSource) ([]*v1pb.DataSource, 
 			AuthenticationDatabase:    ds.GetAuthenticationDatabase(),
 			Sid:                       ds.GetSid(),
 			ServiceName:               ds.GetServiceName(),
+			SshHost:                   ds.GetSshHost(),
+			SshPort:                   ds.GetSshPort(),
+			SshUser:                   ds.GetSshUser(),
 			ExternalSecret:            externalSecret,
 			AuthenticationType:        authenticationType,
 			SaslConfig:                convertDataSourceSaslConfig(ds.GetSaslConfig()),
@@ -1408,7 +1414,7 @@ func convertV1DataSourceType(tp v1pb.DataSourceType) (storepb.DataSourceType, er
 }
 
 func (s *InstanceService) instanceCountGuard(ctx context.Context) error {
-	instanceLimit := s.licenseService.GetPlanLimitValue(ctx, enterprise.PlanLimitMaximumInstance)
+	instanceLimit := s.licenseService.GetInstanceLimit(ctx)
 
 	count, err := s.store.CountInstance(ctx, &store.CountInstanceMessage{})
 	if err != nil {

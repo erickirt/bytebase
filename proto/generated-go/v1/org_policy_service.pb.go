@@ -103,8 +103,6 @@ const (
 	PolicyResourceType_WORKSPACE                 PolicyResourceType = 1
 	PolicyResourceType_ENVIRONMENT               PolicyResourceType = 2
 	PolicyResourceType_PROJECT                   PolicyResourceType = 3
-	PolicyResourceType_INSTANCE                  PolicyResourceType = 4
-	PolicyResourceType_DATABASE                  PolicyResourceType = 5
 )
 
 // Enum value maps for PolicyResourceType.
@@ -114,16 +112,12 @@ var (
 		1: "WORKSPACE",
 		2: "ENVIRONMENT",
 		3: "PROJECT",
-		4: "INSTANCE",
-		5: "DATABASE",
 	}
 	PolicyResourceType_value = map[string]int32{
 		"RESOURCE_TYPE_UNSPECIFIED": 0,
 		"WORKSPACE":                 1,
 		"ENVIRONMENT":               2,
 		"PROJECT":                   3,
-		"INSTANCE":                  4,
-		"DATABASE":                  5,
 	}
 )
 
@@ -1121,13 +1115,15 @@ func (x *QueryDataPolicy) GetTimeout() *durationpb.Duration {
 	return nil
 }
 
+// The SQL review rules. Check the SQL_REVIEW_RULES_DOCUMENTATION.md for details.
 type SQLReviewRule struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	Level         SQLReviewRuleLevel     `protobuf:"varint,2,opt,name=level,proto3,enum=bytebase.v1.SQLReviewRuleLevel" json:"level,omitempty"`
-	Payload       string                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
-	Engine        Engine                 `protobuf:"varint,4,opt,name=engine,proto3,enum=bytebase.v1.Engine" json:"engine,omitempty"`
-	Comment       string                 `protobuf:"bytes,5,opt,name=comment,proto3" json:"comment,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Type  string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Level SQLReviewRuleLevel     `protobuf:"varint,2,opt,name=level,proto3,enum=bytebase.v1.SQLReviewRuleLevel" json:"level,omitempty"`
+	// The payload is a JSON string that varies by rule type.
+	Payload       string `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
+	Engine        Engine `protobuf:"varint,4,opt,name=engine,proto3,enum=bytebase.v1.Engine" json:"engine,omitempty"`
+	Comment       string `protobuf:"bytes,5,opt,name=comment,proto3" json:"comment,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1449,6 +1445,21 @@ type MaskingExceptionPolicy_MaskingException struct {
 	// - `group:{email}`: An email address for group.
 	Member string `protobuf:"bytes,3,opt,name=member,proto3" json:"member,omitempty"`
 	// The condition that is associated with this exception policy instance.
+	// The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+	// If the condition is empty, means the user can access all databases without expiration.
+	//
+	// Support variables:
+	// resource.instance_id: the instance resource id. Only support "==" operation.
+	// resource.database_name: the database name. Only support "==" operation.
+	// resource.schema_name: the schema name. Only support "==" operation.
+	// resource.table_name: the table name. Only support "==" operation.
+	// resource.column_name: the column name. Only support "==" operation.
+	// request.time: the expiration. Only support "<" operation in `request.time < timestamp("{ISO datetime string format}")`
+	// All variables should join with "&&" condition.
+	//
+	// For example:
+	// resource.instance_id == "local" && resource.database_name == "employee" && request.time < timestamp("2025-04-30T11:10:39.000Z")
+	// resource.instance_id == "local" && resource.database_name == "employee"
 	Condition     *expr.Expr `protobuf:"bytes,4,opt,name=condition,proto3" json:"condition,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1508,7 +1519,30 @@ func (x *MaskingExceptionPolicy_MaskingException) GetCondition() *expr.Expr {
 type MaskingRulePolicy_MaskingRule struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// A unique identifier for a node in UUID format.
-	Id            string     `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// The condition for the masking rule.
+	// The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+	//
+	// Support variables:
+	// environment_id: the environment resource id.
+	// project_id: the project resource id.
+	// instance_id: the instance resource id.
+	// database_name: the database name.
+	// table_name: the table name.
+	// column_name: the column name.
+	// classification_level: the classification level.
+	//
+	// Each variable support following operations:
+	// ==: the value equals the target.
+	// !=: the value not equals the target.
+	// in: the value matches one of the targets.
+	// !(in): the value not matches any of the targets.
+	//
+	// For example:
+	// environment_id == "test" && project_id == "sample-project"
+	// instance_id == "sample-instance" && database_name == "employee" && table_name in ["table1", "table2"]
+	// environment_id != "test" || !(project_id in ["poject1", "prject2"])
+	// instance_id == "sample-instance" && (database_name == "db1" || database_name == "db2")
 	Condition     *expr.Expr `protobuf:"bytes,2,opt,name=condition,proto3" json:"condition,omitempty"`
 	SemanticType  string     `protobuf:"bytes,3,opt,name=semantic_type,json=semanticType,proto3" json:"semantic_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1678,14 +1712,12 @@ const file_v1_org_policy_service_proto_rawDesc = "" +
 	"\x11DATA_SOURCE_QUERY\x10\x0e\x12\x0f\n" +
 	"\vDATA_EXPORT\x10\x0f\x12\x0e\n" +
 	"\n" +
-	"DATA_QUERY\x10\x10\"\x04\b\x02\x10\x02\"\x04\b\x04\x10\x04\"\x04\b\x06\x10\x06\"\x04\b\x05\x10\x05\"\x04\b\a\x10\a*|\n" +
+	"DATA_QUERY\x10\x10\"\x04\b\x02\x10\x02\"\x04\b\x04\x10\x04\"\x04\b\x06\x10\x06\"\x04\b\x05\x10\x05\"\x04\b\a\x10\a*`\n" +
 	"\x12PolicyResourceType\x12\x1d\n" +
 	"\x19RESOURCE_TYPE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tWORKSPACE\x10\x01\x12\x0f\n" +
 	"\vENVIRONMENT\x10\x02\x12\v\n" +
-	"\aPROJECT\x10\x03\x12\f\n" +
-	"\bINSTANCE\x10\x04\x12\f\n" +
-	"\bDATABASE\x10\x05*Q\n" +
+	"\aPROJECT\x10\x03*Q\n" +
 	"\x12SQLReviewRuleLevel\x12\x15\n" +
 	"\x11LEVEL_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
@@ -1696,7 +1728,7 @@ const file_v1_org_policy_service_proto_rawDesc = "" +
 	"\fListPolicies\x12 .bytebase.v1.ListPoliciesRequest\x1a!.bytebase.v1.ListPoliciesResponse\"\xd2\x01\xdaA\x00\x8a\xea0\x10bb.policies.list\x90\xea0\x01\x82\xd3\xe4\x93\x02\xb0\x01Z\"\x12 /v1/{parent=projects/*}/policiesZ&\x12$/v1/{parent=environments/*}/policiesZ#\x12!/v1/{parent=instances/*}/policiesZ/\x12-/v1/{parent=instances/*/databases/*}/policies\x12\f/v1/policies\x12\xd5\x02\n" +
 	"\fCreatePolicy\x12 .bytebase.v1.CreatePolicyRequest\x1a\x13.bytebase.v1.Policy\"\x8d\x02\xdaA\rparent,policy\x8a\xea0\x12bb.policies.create\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\xd8\x01:\x06policyZ*:\x06policy\" /v1/{parent=projects/*}/policiesZ.:\x06policy\"$/v1/{parent=environments/*}/policiesZ+:\x06policy\"!/v1/{parent=instances/*}/policiesZ7:\x06policy\"-/v1/{parent=instances/*/databases/*}/policies\"\f/v1/policies\x12\x86\x03\n" +
 	"\fUpdatePolicy\x12 .bytebase.v1.UpdatePolicyRequest\x1a\x13.bytebase.v1.Policy\"\xbe\x02\xdaA\x12policy,update_mask\x8a\xea0\x12bb.policies.update\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\x84\x02:\x06policyZ1:\x06policy2'/v1/{policy.name=projects/*/policies/*}Z5:\x06policy2+/v1/{policy.name=environments/*/policies/*}Z2:\x06policy2(/v1/{policy.name=instances/*/policies/*}Z>:\x06policy24/v1/{policy.name=instances/*/databases/*/policies/*}2\x1c/v1/{policy.name=policies/*}\x12\xb0\x02\n" +
-	"\fDeletePolicy\x12 .bytebase.v1.DeletePolicyRequest\x1a\x16.google.protobuf.Empty\"\xe5\x01\xdaA\x04name\x8a\xea0\x12bb.policies.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\xb9\x01Z\"* /v1/{name=projects/*/policies/*}Z&*$/v1/{name=environments/*/policies/*}Z#*!/v1/{name=instances/*/policies/*}Z/*-/v1/{name=instances/*/databases/*/policies/*}*\x15/v1/{name=policies/*}B\x11Z\x0fgenerated-go/v1b\x06proto3"
+	"\fDeletePolicy\x12 .bytebase.v1.DeletePolicyRequest\x1a\x16.google.protobuf.Empty\"\xe5\x01\xdaA\x04name\x8a\xea0\x12bb.policies.delete\x90\xea0\x01\x98\xea0\x01\x82\xd3\xe4\x93\x02\xb9\x01Z\"* /v1/{name=projects/*/policies/*}Z&*$/v1/{name=environments/*/policies/*}Z#*!/v1/{name=instances/*/policies/*}Z/*-/v1/{name=instances/*/databases/*/policies/*}*\x15/v1/{name=policies/*}B4Z2github.com/bytebase/bytebase/proto/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_org_policy_service_proto_rawDescOnce sync.Once

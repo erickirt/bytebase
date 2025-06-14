@@ -7,6 +7,19 @@ import "store/common.proto";
 
 option go_package = "generated-go/store";
 
+message TaskRun {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    PENDING = 1;
+    RUNNING = 2;
+    DONE = 3;
+    FAILED = 4;
+    CANCELED = 5;
+    NOT_STARTED = 6;
+    SKIPPED = 7;
+  }
+}
+
 message TaskRunResult {
   string detail = 1;
   // Format: instances/{instance}/databases/{database}/changelogs/{changelog}
@@ -52,6 +65,7 @@ message SchedulerInfo {
     oneof cause {
       bool connection_limit = 1;
       int32 task_uid = 2;
+      bool parallel_tasks_limit = 3;
     }
   }
   WaitingCause waiting_cause = 2;

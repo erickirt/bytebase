@@ -8,9 +8,8 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	"github.com/bytebase/bytebase/backend/store"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
@@ -32,10 +31,10 @@ type Manager struct {
 	groupMembers    map[string]map[string]bool
 	PredefinedRoles []*store.RoleMessage
 	store           *store.Store
-	licenseService  enterprise.LicenseService
+	licenseService  *enterprise.LicenseService
 }
 
-func NewManager(store *store.Store, licenseService enterprise.LicenseService) (*Manager, error) {
+func NewManager(store *store.Store, licenseService *enterprise.LicenseService) (*Manager, error) {
 	predefinedRoles, err := loadPredefinedRoles()
 	if err != nil {
 		return nil, err
@@ -53,11 +52,6 @@ func NewManager(store *store.Store, licenseService enterprise.LicenseService) (*
 // CEL on the binding is not considered.
 // When multiple projects are specified, the user should have permission on every projects.
 func (m *Manager) CheckPermission(ctx context.Context, p Permission, user *store.UserMessage, projectIDs ...string) (bool, error) {
-	if m.licenseService.IsFeatureEnabled(base.FeatureRBAC) != nil {
-		// nolint
-		return true, nil
-	}
-
 	policyMessage, err := m.store.GetWorkspaceIamPolicy(ctx)
 	if err != nil {
 		return false, err
@@ -144,7 +138,7 @@ func check(userID int, p Permission, policy *storepb.IamPolicy, rolePermissions 
 			continue
 		}
 		for _, member := range binding.GetMembers() {
-			if member == base.AllUsers {
+			if member == common.AllUsers {
 				return true
 			}
 			if member == userName {

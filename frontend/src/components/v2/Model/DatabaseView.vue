@@ -1,8 +1,8 @@
 <template>
   <div class="flex flex-row justify-start items-center gap-x-1" v-bind="$attrs">
     <FeatureBadge
-      feature="bb.feature.database-grouping"
-      custom-class="mr-2"
+      :feature="PlanFeature.FEATURE_DATABASE_GROUPS"
+      class="mr-2"
       :instance="database.instanceResource"
     />
     <InstanceV1EngineIcon :instance="database.instanceResource" />
@@ -26,6 +26,7 @@
 import { FeatureBadge } from "@/components/FeatureGuard";
 import { DatabaseV1Name, EnvironmentV1Name } from "@/components/v2";
 import { useDatabaseV1ByName } from "@/store";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import { InstanceV1EngineIcon } from "./Instance";
 
 const props = defineProps<{

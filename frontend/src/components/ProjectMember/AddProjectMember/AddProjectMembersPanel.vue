@@ -18,7 +18,7 @@
           v-if="binding"
           ref="formRefs"
           class="w-full border-b mb-4 pb-4"
-          :project="project"
+          :project-name="project.name"
           :binding="binding"
           :allow-remove="state.bindings.length > 1"
           @remove="handleRemove(index)"
@@ -53,8 +53,7 @@ import {
   useProjectIamPolicy,
   useProjectIamPolicyStore,
 } from "@/store";
-import type { ComposedProject } from "@/types";
-import { PresetRoleType } from "@/types";
+import { PresetRoleType, type ComposedProject } from "@/types";
 import { Binding } from "@/types/proto/v1/iam_policy";
 import { getBindingIdentifier } from "../utils";
 import AddProjectMemberForm from "./AddProjectMemberForm.vue";
@@ -74,7 +73,11 @@ interface LocalState {
 
 const { t } = useI18n();
 const state = reactive<LocalState>({
-  bindings: props.bindings || [Binding.fromPartial({})],
+  bindings: props.bindings || [
+    Binding.fromPartial({
+      role: PresetRoleType.PROJECT_VIEWER,
+    }),
+  ],
 });
 const formRefs = ref<InstanceType<typeof AddProjectMemberForm>[]>([]);
 const projectResourceName = computed(() => props.project.name);
@@ -90,27 +93,15 @@ const allowConfirm = computed(() => {
       return false;
     }
   }
-
-  for (const binding of state.bindings) {
-    if (binding.members.length === 0 || binding.role === "") {
-      return false;
-    }
-    // Filter uncompleted querier and exporter options.
-    // TODO: use parsed expression to check if the expression is valid.
-    if (binding.role === PresetRoleType.PROJECT_EXPORTER) {
-      if (binding.condition?.expression === "") {
-        return false;
-      }
-      if (!binding.condition?.expression.includes("request.row_limit")) {
-        return false;
-      }
-    }
-  }
   return true;
 });
 
 const handleAddMore = () => {
-  state.bindings.push(Binding.fromPartial({}));
+  state.bindings.push(
+    Binding.fromPartial({
+      role: PresetRoleType.PROJECT_VIEWER,
+    })
+  );
 };
 
 const handleRemove = (index: number) => {

@@ -1,10 +1,6 @@
 <template>
   <div class="w-full space-y-4 text-sm">
-    <FeatureAttentionForInstanceLicense
-      v-if="hasCustomApprovalFeature"
-      feature="bb.feature.custom-approval"
-    />
-    <FeatureAttention v-else feature="bb.feature.custom-approval" />
+    <FeatureAttention :feature="PlanFeature.FEATURE_APPROVAL_WORKFLOW" />
 
     <CustomApproval v-if="state.ready" />
     <div v-else class="w-full py-[4rem] flex justify-center items-center">
@@ -15,7 +11,7 @@
   <ApprovalRuleDialog />
 
   <FeatureModal
-    feature="bb.feature.custom-approval"
+    :feature="PlanFeature.FEATURE_APPROVAL_WORKFLOW"
     :open="state.showFeatureModal"
     @cancel="state.showFeatureModal = false"
   />
@@ -30,17 +26,14 @@ import {
   provideCustomApprovalContext,
   TabValueList,
 } from "@/components/CustomApproval/Settings/components/CustomApproval/";
-import {
-  FeatureAttention,
-  FeatureAttentionForInstanceLicense,
-  FeatureModal,
-} from "@/components/FeatureGuard";
+import { FeatureAttention, FeatureModal } from "@/components/FeatureGuard";
 import { useRouteHash } from "@/composables/useRouteHash";
 import {
   featureToRef,
   useWorkspaceApprovalSettingStore,
   useRiskStore,
 } from "@/store";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 
 interface LocalState {
   ready: boolean;
@@ -56,7 +49,7 @@ const state = reactive<LocalState>({
   showFeatureModal: false,
 });
 const tab = useRouteHash("rules", TabValueList, "replace");
-const hasCustomApprovalFeature = featureToRef("bb.feature.custom-approval");
+const hasCustomApprovalFeature = featureToRef(PlanFeature.FEATURE_APPROVAL_WORKFLOW);
 
 provideCustomApprovalContext({
   hasFeature: hasCustomApprovalFeature,

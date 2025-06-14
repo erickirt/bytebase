@@ -96,11 +96,13 @@ type SearchAuditLogsRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Parent string                 `protobuf:"bytes,5,opt,name=parent,proto3" json:"parent,omitempty"`
 	// The filter of the log. It should be a valid CEL expression.
+	// The syntax and semantics of CEL are documented at https://github.com/google/cel-spec
+	//
 	// Supported filter:
-	// - method
-	// - severity
-	// - user
-	// - create_time
+	// - method: the API name, can be found in the docs, should start with "/bytebase.v1." prefix. For example "/bytebase.v1.UserService/CreateUser". Support "==" operator.
+	// - severity: support "==" operator, check Severity enum in AuditLog message for values.
+	// - user: the actor, should in "users/{email}" format, support "==" operator.
+	// - create_time: support ">=" and "<=" operator.
 	//
 	// For example:
 	//   - filter = "method == '/bytebase.v1.SQLService/Query'"
@@ -250,11 +252,7 @@ type ExportAuditLogsRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Parent string                 `protobuf:"bytes,4,opt,name=parent,proto3" json:"parent,omitempty"`
 	// The filter of the log. It should be a valid CEL expression.
-	// For example:
-	//   - filter = "method == '/bytebase.v1.SQLService/Query'"
-	//   - filter = "method == '/bytebase.v1.SQLService/Query' && severity == 'ERROR'"
-	//   - filter = "method == '/bytebase.v1.SQLService/Query' && severity == 'ERROR' && user == 'users/bb@bytebase.com'"
-	//   - filter = "method == '/bytebase.v1.SQLService/Query' && severity == 'ERROR' && create_time <= '2021-01-01T00:00:00Z' && create_time >= '2020-01-01T00:00:00Z'"
+	// Check the filter field in the SearchAuditLogsRequest message.
 	Filter string `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
 	// The order by of the log.
 	// Only support order by create_time.
@@ -698,7 +696,7 @@ const file_v1_audit_log_service_proto_rawDesc = "" +
 	"\x1acaller_supplied_user_agent\x18\x02 \x01(\tR\x17callerSuppliedUserAgent2\xa5\x03\n" +
 	"\x0fAuditLogService\x12\xc7\x01\n" +
 	"\x0fSearchAuditLogs\x12#.bytebase.v1.SearchAuditLogsRequest\x1a$.bytebase.v1.SearchAuditLogsResponse\"i\x8a\xea0\x13bb.auditLogs.search\x90\xea0\x01\x82\xd3\xe4\x93\x02H:\x01*Z\x19:\x01*\"\x14/v1/auditLogs:search\"(/v1/{parent=projects/*}/auditLogs:search\x12\xc7\x01\n" +
-	"\x0fExportAuditLogs\x12#.bytebase.v1.ExportAuditLogsRequest\x1a$.bytebase.v1.ExportAuditLogsResponse\"i\x8a\xea0\x13bb.auditLogs.export\x90\xea0\x01\x82\xd3\xe4\x93\x02H:\x01*Z\x19:\x01*\"\x14/v1/auditLogs:export\"(/v1/{parent=projects/*}/auditLogs:exportB\x11Z\x0fgenerated-go/v1b\x06proto3"
+	"\x0fExportAuditLogs\x12#.bytebase.v1.ExportAuditLogsRequest\x1a$.bytebase.v1.ExportAuditLogsResponse\"i\x8a\xea0\x13bb.auditLogs.export\x90\xea0\x01\x82\xd3\xe4\x93\x02H:\x01*Z\x19:\x01*\"\x14/v1/auditLogs:export\"(/v1/{parent=projects/*}/auditLogs:exportB4Z2github.com/bytebase/bytebase/proto/generated-go/v1b\x06proto3"
 
 var (
 	file_v1_audit_log_service_proto_rawDescOnce sync.Once

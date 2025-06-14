@@ -85,8 +85,8 @@
           <NButton @click="$emit('close')">{{ $t("common.cancel") }}</NButton>
           <NButton type="primary" :disabled="!allowSave" @click="handleSave">
             <FeatureBadge
-              feature="bb.feature.custom-role"
-              custom-class="mr-1 text-white"
+              :feature="PlanFeature.FEATURE_CUSTOM_ROLES"
+              class="mr-1 text-white"
             />
             {{ mode === "ADD" ? $t("common.add") : $t("common.update") }}
           </NButton>
@@ -116,6 +116,7 @@ import { roleNamePrefix } from "@/store/modules/v1/common";
 import type { ValidatedMessage } from "@/types";
 import { PERMISSIONS } from "@/types";
 import { Role } from "@/types/proto/v1/role_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import { extractRoleResourceName } from "@/utils";
 import { displayPermissionTitle } from "@/utils/permission";
 import { useCustomRoleSettingContext } from "../context";
@@ -143,7 +144,7 @@ const roleStore = useRoleStore();
 const { hasCustomRoleFeature, showFeatureModal } =
   useCustomRoleSettingContext();
 const state = reactive<LocalState>({
-  role: Role.fromJSON({}),
+  role: Role.fromPartial({}),
   dirty: false,
   loading: false,
   showImportPermissionFromRoleModal: false,

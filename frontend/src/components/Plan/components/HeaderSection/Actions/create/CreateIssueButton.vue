@@ -40,10 +40,13 @@ import {
   usePlanContext,
 } from "@/components/Plan/logic";
 import { planCheckRunSummaryForCheckRunList } from "@/components/PlanCheckRun/common";
-import { useSQLCheckContext } from "@/components/SQLCheck";
 import { issueServiceClient, rolloutServiceClient } from "@/grpcweb";
 import { PROJECT_V1_ROUTE_ISSUE_DETAIL } from "@/router/dashboard/projectV1";
-import { useCurrentUserV1, usePolicyV1Store } from "@/store";
+import {
+  useCurrentProjectV1,
+  useCurrentUserV1,
+  usePolicyV1Store,
+} from "@/store";
 import { emptyIssue, type ComposedIssue } from "@/types";
 import { Issue, IssueStatus, Issue_Type } from "@/types/proto/v1/issue_service";
 import { PolicyType } from "@/types/proto/v1/org_policy_service";
@@ -57,16 +60,16 @@ import {
 const { t } = useI18n();
 const router = useRouter();
 const dialog = useDialog();
+const { project } = useCurrentProjectV1();
 const policyV1Store = usePolicyV1Store();
-const { plan } = usePlanContext();
-const { runSQLCheck } = useSQLCheckContext();
+const { plan, planCheckRunList } = usePlanContext();
 const loading = ref(false);
 const restrictIssueCreationForSqlReviewPolicy = ref(false);
 
 const planCheckStatus = computed((): PlanCheckRun_Result_Status => {
   const planCheckList = uniqBy(
-    plan.value.steps.flatMap((step) =>
-      step.specs.flatMap((spec) => planCheckRunListForSpec(plan.value, spec))
+    plan.value.specs.flatMap((spec) =>
+      planCheckRunListForSpec(planCheckRunList.value, spec)
     ),
     (checkRun) => checkRun.name
   );
@@ -82,7 +85,7 @@ const planCheckStatus = computed((): PlanCheckRun_Result_Status => {
 
 const issueCreateErrorList = computed(() => {
   const errorList: string[] = [];
-  if (!hasProjectPermissionV2(plan.value.projectEntity, "bb.plans.create")) {
+  if (!hasProjectPermissionV2(project.value, "bb.plans.create")) {
     errorList.push(t("common.missing-required-permission"));
   }
   if (!plan.value.title.trim()) {
@@ -114,7 +117,7 @@ watchEffect(async () => {
 
   const projectLevelPolicy =
     await policyV1Store.getOrFetchPolicyByParentAndType({
-      parentPath: plan.value.project,
+      parentPath: project.value.name,
       policyType: PolicyType.RESTRICT_ISSUE_CREATION_FOR_SQL_REVIEW,
     });
   if (projectLevelPolicy?.restrictIssueCreationForSqlReviewPolicy?.disallow) {
@@ -140,15 +143,11 @@ const handleCreateIssue = async () => {
 
 const doCreateIssue = async () => {
   loading.value = true;
-  const check = runSQLCheck.value;
-  if (check && !(await check())) {
-    loading.value = false;
-    return;
-  }
+  // TODO(steven): Check plan check results before creating issue.
 
   try {
     const createdIssue = await issueServiceClient.createIssue({
-      parent: plan.value.project,
+      parent: project.value.name,
       issue: {
         ...Issue.fromPartial(buildIssue()),
         rollout: "",
@@ -161,7 +160,7 @@ const doCreateIssue = async () => {
       planEntity: plan.value,
     };
     const createdRollout = await rolloutServiceClient.createRollout({
-      parent: plan.value.project,
+      parent: project.value.name,
       rollout: {
         plan: plan.value.name,
       },
@@ -174,7 +173,7 @@ const doCreateIssue = async () => {
       router.push({
         name: PROJECT_V1_ROUTE_ISSUE_DETAIL,
         params: {
-          projectId: extractProjectResourceName(plan.value.project),
+          projectId: extractProjectResourceName(plan.value.name),
           issueSlug: issueV1Slug(composedIssue),
         },
       });
@@ -190,9 +189,7 @@ const buildIssue = () => {
   const issue = emptyIssue();
   const me = useCurrentUserV1();
   issue.creator = `users/${me.value.email}`;
-  issue.creatorEntity = me.value;
-  issue.project = plan.value.projectEntity.name;
-  issue.projectEntity = plan.value.projectEntity;
+  issue.project = project.value.name;
   issue.title = plan.value.title;
   issue.description = plan.value.description;
   issue.status = IssueStatus.OPEN;

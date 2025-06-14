@@ -10,9 +10,10 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/common/log"
 	"github.com/bytebase/bytebase/backend/component/state"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	"github.com/bytebase/bytebase/backend/store"
 	storepb "github.com/bytebase/bytebase/proto/generated-go/store"
 )
@@ -22,7 +23,7 @@ const (
 )
 
 // NewScheduler creates a new plan check scheduler.
-func NewScheduler(s *store.Store, licenseService enterprise.LicenseService, stateCfg *state.State) *Scheduler {
+func NewScheduler(s *store.Store, licenseService *enterprise.LicenseService, stateCfg *state.State) *Scheduler {
 	return &Scheduler{
 		store:          s,
 		licenseService: licenseService,
@@ -34,7 +35,7 @@ func NewScheduler(s *store.Store, licenseService enterprise.LicenseService, stat
 // Scheduler is the plan check run scheduler.
 type Scheduler struct {
 	store          *store.Store
-	licenseService enterprise.LicenseService
+	licenseService *enterprise.LicenseService
 	stateCfg       *state.State
 	executors      map[store.PlanCheckRunType]Executor
 }
@@ -112,6 +113,9 @@ func (s *Scheduler) runPlanCheckRun(ctx context.Context, planCheckRun *store.Pla
 	}
 
 	maximumConnections := int(instance.Metadata.GetMaximumConnections())
+	if maximumConnections <= 0 {
+		maximumConnections = common.DefaultInstanceMaximumConnections
+	}
 	if s.stateCfg.InstanceOutstandingConnections.Increment(instance.ResourceID, maximumConnections) {
 		return
 	}

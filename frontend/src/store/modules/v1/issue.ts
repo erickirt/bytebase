@@ -4,17 +4,24 @@ import { defineStore } from "pinia";
 import type { WatchCallback } from "vue";
 import { ref, watch } from "vue";
 import { issueServiceClient } from "@/grpcweb";
-import type { ComposedIssue, IssueFilter } from "@/types";
+import {
+  SYSTEM_BOT_EMAIL,
+  type ComposedIssue,
+  type IssueFilter,
+} from "@/types";
 import type { ApprovalStep } from "@/types/proto/v1/issue_service";
 import {
   issueStatusToJSON,
   ApprovalNode_Type,
 } from "@/types/proto/v1/issue_service";
 import { memberMapToRolesInProjectIAM } from "@/utils";
+import { useUserStore } from "../user";
+import { userNamePrefix } from "./common";
 import {
   shallowComposeIssue,
   type ComposeIssueConfig,
 } from "./experimental-issue";
+import { useProjectV1Store } from "./project";
 
 export type ListIssueParams = {
   find: IssueFilter;
@@ -24,20 +31,15 @@ export type ListIssueParams = {
 
 export const buildIssueFilter = (find: IssueFilter): string => {
   const filter: string[] = [];
-  if (find.principal) {
-    filter.push(`principal = "${find.principal}"`);
-  }
   if (find.creator) {
-    filter.push(`creator = "${find.creator}"`);
+    filter.push(`creator == "${find.creator}"`);
   }
   if (find.subscriber) {
-    filter.push(`subscriber = "${find.subscriber}"`);
+    filter.push(`subscriber == "${find.subscriber}"`);
   }
-  if (find.statusList) {
+  if (find.statusList && find.statusList.length > 0) {
     filter.push(
-      `status = "${find.statusList
-        .map((s) => issueStatusToJSON(s))
-        .join(" | ")}"`
+      `status in [${find.statusList.map((s) => `"${issueStatusToJSON(s)}"`).join(",")}]`
     );
   }
   if (find.createdTsAfter) {
@@ -51,22 +53,22 @@ export const buildIssueFilter = (find: IssueFilter): string => {
     );
   }
   if (find.type) {
-    filter.push(`type = "${find.type}"`);
+    filter.push(`type == "${find.type}"`);
   }
   if (find.taskType) {
-    filter.push(`task_type = "${find.taskType}"`);
+    filter.push(`task_type == "${find.taskType}"`);
   }
   if (find.instance) {
-    filter.push(`instance = "${find.instance}"`);
+    filter.push(`instance == "${find.instance}"`);
   }
   if (find.database) {
-    filter.push(`database = "${find.database}"`);
+    filter.push(`database == "${find.database}"`);
   }
   if (find.labels && find.labels.length > 0) {
-    filter.push(`labels = "${find.labels.join(" & ")}"`);
+    filter.push(`labels in [${find.labels.map((l) => `"${l}"`).join(",")}]`);
   }
   if (find.hasPipeline !== undefined) {
-    filter.push(`has_pipeline = "${find.hasPipeline}"`);
+    filter.push(`has_pipeline == "${find.hasPipeline}"`);
   }
   return filter.join(" && ");
 };
@@ -96,6 +98,9 @@ export const useIssueV1Store = defineStore("issue_v1", () => {
     const composedIssues = await Promise.all(
       resp.issues.map((issue) => shallowComposeIssue(issue, composeIssueConfig))
     );
+    // Preprare creator for the issues.
+    const users = uniq(composedIssues.map((issue) => issue.creator));
+    await useUserStore().batchGetUsers(users);
     return {
       nextPageToken: resp.nextPageToken,
       issues: composedIssues,
@@ -124,7 +129,7 @@ export const candidatesOfApprovalStepV1 = (
   issue: ComposedIssue,
   step: ApprovalStep
 ) => {
-  const project = issue.projectEntity;
+  const project = useProjectV1Store().getProjectByName(issue.project);
 
   const candidates = step.nodes.flatMap((node) => {
     const { type, role } = node;
@@ -142,8 +147,14 @@ export const candidatesOfApprovalStepV1 = (
 
   return uniq(
     candidates.filter((user) => {
-      if (!issue.projectEntity.allowSelfApproval) {
-        return user !== issue.creator;
+      // Exclude system bot user.
+      if (user === `${userNamePrefix}${SYSTEM_BOT_EMAIL}`) {
+        return false;
+      }
+      // If the project does not allow self-approval, exclude the creator.
+      const project = useProjectV1Store().getProjectByName(issue.project);
+      if (!project.allowSelfApproval && user === issue.creator) {
+        return false;
       }
       return true;
     })

@@ -3,7 +3,7 @@ package mysql
 
 import (
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	parser "github.com/bytebase/mysql-parser"
@@ -27,7 +27,7 @@ func (t tableState) tableList() []string {
 	for tableName := range t {
 		tableList = append(tableList, tableName)
 	}
-	sort.Strings(tableList)
+	slices.Sort(tableList)
 	return tableList
 }
 
@@ -39,7 +39,7 @@ func (t tablePK) tableList() []string {
 	for tableName := range t {
 		tableList = append(tableList, tableName)
 	}
-	sort.Strings(tableList)
+	slices.Sort(tableList)
 	return tableList
 }
 
@@ -95,4 +95,44 @@ func isKeyword(suspect string) bool {
 		}
 	}
 	return false
+}
+
+func columnNeedDefault(ctx parser.IFieldDefinitionContext) bool {
+	if ctx.GENERATED_SYMBOL() != nil {
+		return false
+	}
+	for _, attr := range ctx.AllColumnAttribute() {
+		if attr.AUTO_INCREMENT_SYMBOL() != nil || attr.PRIMARY_SYMBOL() != nil {
+			return false
+		}
+	}
+
+	if ctx.DataType() == nil {
+		return false
+	}
+
+	switch ctx.DataType().GetType_().GetTokenType() {
+	case parser.MySQLParserBLOB_SYMBOL,
+		parser.MySQLParserTINYBLOB_SYMBOL,
+		parser.MySQLParserMEDIUMBLOB_SYMBOL,
+		parser.MySQLParserLONGBLOB_SYMBOL,
+		parser.MySQLParserJSON_SYMBOL,
+		parser.MySQLParserTINYTEXT_SYMBOL,
+		parser.MySQLParserTEXT_SYMBOL,
+		parser.MySQLParserMEDIUMTEXT_SYMBOL,
+		parser.MySQLParserLONGTEXT_SYMBOL,
+		// LONG VARBINARY and LONG VARCHAR.
+		parser.MySQLParserLONG_SYMBOL,
+		parser.MySQLParserSERIAL_SYMBOL,
+		parser.MySQLParserGEOMETRY_SYMBOL,
+		parser.MySQLParserGEOMETRYCOLLECTION_SYMBOL,
+		parser.MySQLParserPOINT_SYMBOL,
+		parser.MySQLParserMULTIPOINT_SYMBOL,
+		parser.MySQLParserLINESTRING_SYMBOL,
+		parser.MySQLParserMULTILINESTRING_SYMBOL,
+		parser.MySQLParserPOLYGON_SYMBOL,
+		parser.MySQLParserMULTIPOLYGON_SYMBOL:
+		return false
+	}
+	return true
 }

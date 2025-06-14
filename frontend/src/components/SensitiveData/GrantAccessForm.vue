@@ -12,7 +12,7 @@
           <DatabaseResourceForm
             v-model:database-resources="state.databaseResources"
             :project-name="projectName"
-            :required-feature="'bb.feature.sensitive-data'"
+            :required-feature="PlanFeature.FEATURE_DATA_MASKING"
             :include-cloumn="true"
           />
         </div>
@@ -44,6 +44,16 @@
 
         <div class="w-full">
           <p class="mb-2 text-main">
+            {{ $t("common.reason") }}
+          </p>
+          <NInput
+            v-model:value="state.description"
+            :placeholder="$t('common.description')"
+          />
+        </div>
+
+        <div class="w-full">
+          <p class="mb-2 text-main">
             {{ $t("common.expiration") }}
           </p>
           <NDatePicker
@@ -52,7 +62,7 @@
             type="datetime"
             :actions="null"
             :update-value-on-close="true"
-            :is-date-disabled="(date: number) => date < Date.now()"
+            :is-date-disabled="(date: number) => date < dayjs().startOf('day').valueOf()"
             clearable
           />
           <span v-if="!state.expirationTimestamp" class="textinfolabel">{{
@@ -90,7 +100,7 @@
 
 <script lang="tsx" setup>
 import { isUndefined } from "lodash-es";
-import { NButton, NCheckbox, NDatePicker } from "naive-ui";
+import { NButton, NCheckbox, NDatePicker, NInput } from "naive-ui";
 import { computed, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import DatabaseResourceForm from "@/components/GrantRequestPanel/DatabaseResourceForm/index.vue";
@@ -109,6 +119,7 @@ import {
   MaskingExceptionPolicy_MaskingException_Action,
   maskingExceptionPolicy_MaskingException_ActionToJSON,
 } from "@/types/proto/v1/org_policy_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import type { SensitiveColumn } from "./types";
 import {
   getExpressionsForDatabaseResource,
@@ -129,6 +140,7 @@ interface LocalState {
   processing: boolean;
   supportActions: Set<MaskingExceptionPolicy_MaskingException_Action>;
   databaseResources?: DatabaseResource[];
+  description: string;
 }
 
 const ACTIONS = [
@@ -143,6 +155,7 @@ const state = reactive<LocalState>({
   databaseResources: props.columnList.map(
     convertSensitiveColumnToDatabaseResource
   ),
+  description: "",
 });
 
 const policyStore = usePolicyV1Store();
@@ -213,28 +226,24 @@ const getPendingUpdatePolicy = async (
 
   for (const action of state.supportActions.values()) {
     for (const member of state.memberList) {
-      if (!state.databaseResources) {
+      const resourceExpressions = state.databaseResources?.map(
+        getExpressionsForDatabaseResource
+      ) ?? [[""]];
+      for (const expressionList of resourceExpressions) {
+        const resourceExpression = [...expressionList, ...expressions].filter(
+          (e) => e
+        );
         maskingExceptions.push({
           member,
           action,
           condition: Expr.fromPartial({
+            description: state.description,
             expression:
-              expressions.length > 0 ? expressions.join(" && ") : undefined,
+              resourceExpression.length > 0
+                ? resourceExpression.join(" && ")
+                : undefined,
           }),
         });
-      } else {
-        for (const databaseResource of state.databaseResources) {
-          const resourceExpressions =
-            getExpressionsForDatabaseResource(databaseResource);
-          resourceExpressions.push(...expressions);
-          maskingExceptions.push({
-            member,
-            action,
-            condition: Expr.fromPartial({
-              expression: resourceExpressions.join(" && "),
-            }),
-          });
-        }
       }
     }
   }

@@ -1,15 +1,15 @@
-import DescriptionSection from "./DescriptionSection";
+import { ChecksView } from "./ChecksView";
 import HeaderSection from "./HeaderSection";
-import PlanCheckSection from "./PlanCheckSection";
+import Overview from "./Overview.vue";
 import SQLCheckSection from "./SQLCheckSection";
-import SpecListSection from "./SpecListSection";
+import SpecDetailView from "./SpecDetailView";
 import StatementSection from "./StatementSection";
 
 export {
+  ChecksView,
   HeaderSection,
-  SpecListSection,
-  PlanCheckSection,
-  StatementSection,
-  DescriptionSection,
+  Overview,
+  SpecDetailView,
   SQLCheckSection,
+  StatementSection,
 };

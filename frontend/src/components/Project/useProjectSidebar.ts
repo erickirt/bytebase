@@ -2,9 +2,7 @@ import {
   Database,
   CircleDot,
   Users,
-  Link,
   Settings,
-  RefreshCcw,
   PencilRuler,
   SearchCodeIcon,
   DownloadIcon,
@@ -27,9 +25,9 @@ import projectV1Routes, {
   PROJECT_V1_ROUTE_DATABASE_GROUPS,
   PROJECT_V1_ROUTE_EXPORT_CENTER,
   PROJECT_V1_ROUTE_AUDIT_LOGS,
-  PROJECT_V1_ROUTE_REVIEW_CENTER,
   PROJECT_V1_ROUTE_RELEASES,
   PROJECT_V1_ROUTE_MASKING_EXEMPTION,
+  PROJECT_V1_ROUTE_PLANS,
 } from "@/router/dashboard/projectV1";
 import { useAppFeature } from "@/store";
 import type { ComposedProject, MaybeRef } from "@/types";
@@ -103,25 +101,13 @@ export const useProjectSidebar = (
             type: "div",
             hide: databaseChangeMode.value === DatabaseChangeMode.EDITOR,
           },
+          {
+            title: t("database.sync-schema.title"),
+            path: PROJECT_V1_ROUTE_SYNC_SCHEMA,
+            type: "div",
+            hide: databaseChangeMode.value === DatabaseChangeMode.EDITOR,
+          },
         ],
-      },
-      {
-        title: t("review-center.self"),
-        icon: () => h(SearchCodeIcon),
-        path: PROJECT_V1_ROUTE_REVIEW_CENTER,
-        type: "div",
-        hide:
-          isDefaultProject.value ||
-          databaseChangeMode.value === DatabaseChangeMode.EDITOR,
-      },
-      {
-        title: t("export-center.self"),
-        icon: () => h(DownloadIcon),
-        path: PROJECT_V1_ROUTE_EXPORT_CENTER,
-        type: "div",
-        hide:
-          isDefaultProject.value ||
-          databaseChangeMode.value === DatabaseChangeMode.EDITOR,
       },
       {
         title: t("changelist.changelists"),
@@ -142,29 +128,23 @@ export const useProjectSidebar = (
           databaseChangeMode.value === DatabaseChangeMode.EDITOR,
       },
       {
-        title: t("database.sync-schema.title"),
-        path: PROJECT_V1_ROUTE_SYNC_SCHEMA,
-        icon: () => h(RefreshCcw),
+        // TODO(claude): rename title to "Plans".
+        title: t("review-center.self"),
+        icon: () => h(SearchCodeIcon),
+        path: PROJECT_V1_ROUTE_PLANS,
         type: "div",
         hide:
           isDefaultProject.value ||
           databaseChangeMode.value === DatabaseChangeMode.EDITOR,
       },
       {
-        title: t("settings.sidebar.integration"),
-        icon: () => h(Link),
+        title: t("export-center.self"),
+        icon: () => h(DownloadIcon),
+        path: PROJECT_V1_ROUTE_EXPORT_CENTER,
         type: "div",
         hide:
           isDefaultProject.value ||
           databaseChangeMode.value === DatabaseChangeMode.EDITOR,
-        expand: true,
-        children: [
-          {
-            title: t("common.webhooks"),
-            path: PROJECT_V1_ROUTE_WEBHOOKS,
-            type: "div",
-          },
-        ],
       },
       {
         title: t("common.manage"),
@@ -177,6 +157,12 @@ export const useProjectSidebar = (
             title: t("common.members"),
             path: PROJECT_V1_ROUTE_MEMBERS,
             type: "div",
+          },
+          {
+            title: t("common.webhooks"),
+            path: PROJECT_V1_ROUTE_WEBHOOKS,
+            type: "div",
+            hide: databaseChangeMode.value === DatabaseChangeMode.EDITOR,
           },
           {
             title: t("project.masking-exemption.self"),

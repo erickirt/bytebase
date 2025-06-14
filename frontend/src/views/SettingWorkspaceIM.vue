@@ -4,7 +4,7 @@
       {{ $t("settings.im-integration.description") }}
       <a
         class="normal-link inline-flex items-center"
-        href="https://www.bytebase.com/docs/change-database/webhook?source=console"
+        href="https://docs.bytebase.com/change-database/webhook?source=console"
         target="__BLANK"
       >
         {{ $t("common.learn-more") }}
@@ -64,6 +64,7 @@ import {
   AppIMSetting_Lark,
   AppIMSetting_Wecom,
   AppIMSetting_DingTalk,
+  Setting_SettingName,
 } from "@/types/proto/v1/setting_service";
 
 interface LocalState {
@@ -87,8 +88,8 @@ const settingStore = useSettingV1Store();
 
 const imSetting = computed(
   () =>
-    settingStore.getSettingByName("bb.app.im")?.value?.appImSettingValue ??
-    AppIMSetting.fromPartial({})
+    settingStore.getSettingByName(Setting_SettingName.APP_IM)?.value
+      ?.appImSettingValue ?? AppIMSetting.fromPartial({})
 );
 
 watch(
@@ -279,7 +280,7 @@ const imList = computed(() => {
                 placeholder={t("common.write-only")}
                 value={state.setting.dingtalk?.clientId ?? ""}
                 onUpdate:value={(val: string) => {
-                  state.setting.dingtalk!.clientId= val;
+                  state.setting.dingtalk!.clientId = val;
                 }}
               />
             </div>
@@ -308,7 +309,7 @@ const imList = computed(() => {
           </div>
         );
       },
-    }
+    },
   ];
 });
 
@@ -418,7 +419,7 @@ const onSave = async () => {
 
   try {
     const setting = await settingStore.upsertSetting({
-      name: "bb.app.im",
+      name: Setting_SettingName.APP_IM,
       value: {
         appImSettingValue: data,
       },

@@ -5,7 +5,7 @@
         <h1 class="text-2xl font-bold">
           {{ title }}
         </h1>
-        <FeatureBadge feature="bb.feature.branding" />
+        <FeatureBadge :feature="PlanFeature.FEATURE_CUSTOM_LOGO" />
       </div>
       <span v-if="!allowEdit" class="text-sm text-gray-400">
         {{ $t("settings.general.workspace.only-admin-can-edit") }}
@@ -55,7 +55,7 @@
   </div>
 
   <FeatureModal
-    feature="bb.feature.branding"
+    :feature="PlanFeature.FEATURE_CUSTOM_LOGO"
     :open="state.showFeatureModal"
     @cancel="state.showFeatureModal = false"
   />
@@ -67,6 +67,8 @@ import { computed, reactive } from "vue";
 import { featureToRef } from "@/store";
 import { useActuatorV1Store } from "@/store/modules/v1/actuator";
 import { useSettingV1Store } from "@/store/modules/v1/setting";
+import { Setting_SettingName } from "@/types/proto/v1/setting_service";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import { FeatureBadge, FeatureModal } from "../FeatureGuard";
 import SingleFileSelector from "../SingleFileSelector.vue";
 
@@ -105,7 +107,7 @@ const allowSave = computed((): boolean => {
   return state.logoUrl !== settingV1Store.brandingLogo;
 });
 
-const hasBrandingFeature = featureToRef("bb.feature.branding");
+const hasBrandingFeature = featureToRef(PlanFeature.FEATURE_CUSTOM_LOGO);
 
 const doUpdate = async (content: string) => {
   if (state.loading) {
@@ -114,7 +116,7 @@ const doUpdate = async (content: string) => {
   state.loading = true;
   try {
     await settingV1Store.upsertSetting({
-      name: "bb.branding.logo",
+      name: Setting_SettingName.BRANDING_LOGO,
       value: {
         stringValue: content,
       },

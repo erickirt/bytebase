@@ -8,11 +8,10 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/bytebase/bytebase/backend/base"
 	"github.com/bytebase/bytebase/backend/common"
 	"github.com/bytebase/bytebase/backend/component/config"
 	"github.com/bytebase/bytebase/backend/component/iam"
-	enterprise "github.com/bytebase/bytebase/backend/enterprise/api"
+	"github.com/bytebase/bytebase/backend/enterprise"
 	"github.com/bytebase/bytebase/backend/store"
 	"github.com/bytebase/bytebase/backend/utils"
 	v1pb "github.com/bytebase/bytebase/proto/generated-go/v1"
@@ -24,11 +23,11 @@ type DatabaseGroupService struct {
 	store          *store.Store
 	profile        *config.Profile
 	iamManager     *iam.Manager
-	licenseService enterprise.LicenseService
+	licenseService *enterprise.LicenseService
 }
 
 // NewDatabaseGroupService creates a new ChangelistService.
-func NewDatabaseGroupService(store *store.Store, profile *config.Profile, iamManager *iam.Manager, licenseService enterprise.LicenseService) *DatabaseGroupService {
+func NewDatabaseGroupService(store *store.Store, profile *config.Profile, iamManager *iam.Manager, licenseService *enterprise.LicenseService) *DatabaseGroupService {
 	return &DatabaseGroupService{
 		store:          store,
 		profile:        profile,
@@ -39,7 +38,7 @@ func NewDatabaseGroupService(store *store.Store, profile *config.Profile, iamMan
 
 // CreateDatabaseGroup creates a database group.
 func (s *DatabaseGroupService) CreateDatabaseGroup(ctx context.Context, request *v1pb.CreateDatabaseGroupRequest) (*v1pb.DatabaseGroup, error) {
-	if err := s.licenseService.IsFeatureEnabled(base.FeatureDatabaseGrouping); err != nil {
+	if err := s.licenseService.IsFeatureEnabled(v1pb.PlanFeature_FEATURE_DATABASE_GROUPS); err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 	projectResourceID, err := common.GetProjectID(request.Parent)
@@ -62,7 +61,7 @@ func (s *DatabaseGroupService) CreateDatabaseGroup(ctx context.Context, request 
 	if !isValidResourceID(request.DatabaseGroupId) {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid database group id %q", request.DatabaseGroupId)
 	}
-	if request.DatabaseGroup.DatabasePlaceholder == "" {
+	if request.DatabaseGroup.Title == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "database group database placeholder is required")
 	}
 	if request.DatabaseGroup.DatabaseExpr == nil || request.DatabaseGroup.DatabaseExpr.Expression == "" {
@@ -75,11 +74,11 @@ func (s *DatabaseGroupService) CreateDatabaseGroup(ctx context.Context, request 
 	storeDatabaseGroup := &store.DatabaseGroupMessage{
 		ResourceID:  request.DatabaseGroupId,
 		ProjectID:   project.ResourceID,
-		Placeholder: request.DatabaseGroup.DatabasePlaceholder,
+		Placeholder: request.DatabaseGroup.Title,
 		Expression:  request.DatabaseGroup.DatabaseExpr,
 	}
 	if request.ValidateOnly {
-		return s.convertStoreToAPIDatabaseGroupFull(ctx, storeDatabaseGroup, projectResourceID)
+		return convertStoreToAPIDatabaseGroupFull(ctx, s.store, storeDatabaseGroup, projectResourceID)
 	}
 
 	user, ok := ctx.Value(common.UserContextKey).(*store.UserMessage)
@@ -98,12 +97,12 @@ func (s *DatabaseGroupService) CreateDatabaseGroup(ctx context.Context, request 
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return s.convertStoreToAPIDatabaseGroupFull(ctx, databaseGroup, projectResourceID)
+	return convertStoreToAPIDatabaseGroupFull(ctx, s.store, databaseGroup, projectResourceID)
 }
 
 // UpdateDatabaseGroup updates a database group.
 func (s *DatabaseGroupService) UpdateDatabaseGroup(ctx context.Context, request *v1pb.UpdateDatabaseGroupRequest) (*v1pb.DatabaseGroup, error) {
-	if err := s.licenseService.IsFeatureEnabled(base.FeatureDatabaseGrouping); err != nil {
+	if err := s.licenseService.IsFeatureEnabled(v1pb.PlanFeature_FEATURE_DATABASE_GROUPS); err != nil {
 		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 	projectResourceID, databaseGroupResourceID, err := common.GetProjectIDDatabaseGroupID(request.DatabaseGroup.Name)
@@ -136,11 +135,11 @@ func (s *DatabaseGroupService) UpdateDatabaseGroup(ctx context.Context, request 
 	var updateDatabaseGroup store.UpdateDatabaseGroupMessage
 	for _, path := range request.UpdateMask.Paths {
 		switch path {
-		case "database_placeholder":
-			if request.DatabaseGroup.DatabasePlaceholder == "" {
+		case "title":
+			if request.DatabaseGroup.Title == "" {
 				return nil, status.Errorf(codes.InvalidArgument, "database group database placeholder is required")
 			}
-			updateDatabaseGroup.Placeholder = &request.DatabaseGroup.DatabasePlaceholder
+			updateDatabaseGroup.Placeholder = &request.DatabaseGroup.Title
 		case "database_expr":
 			if request.DatabaseGroup.DatabaseExpr == nil || request.DatabaseGroup.DatabaseExpr.Expression == "" {
 				return nil, status.Errorf(codes.InvalidArgument, "database group expr is required")
@@ -157,7 +156,7 @@ func (s *DatabaseGroupService) UpdateDatabaseGroup(ctx context.Context, request 
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return s.convertStoreToAPIDatabaseGroupFull(ctx, databaseGroup, projectResourceID)
+	return convertStoreToAPIDatabaseGroupFull(ctx, s.store, databaseGroup, projectResourceID)
 }
 
 // DeleteDatabaseGroup deletes a database group.
@@ -222,7 +221,15 @@ func (s *DatabaseGroupService) ListDatabaseGroups(ctx context.Context, request *
 
 	var apiDatabaseGroups []*v1pb.DatabaseGroup
 	for _, databaseGroup := range databaseGroups {
-		apiDatabaseGroups = append(apiDatabaseGroups, convertStoreToAPIDatabaseGroupBasic(databaseGroup, project.ResourceID))
+		if request.View == v1pb.DatabaseGroupView_DATABASE_GROUP_VIEW_FULL {
+			fullDatabaseGroup, err := convertStoreToAPIDatabaseGroupFull(ctx, s.store, databaseGroup, projectResourceID)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to convert database group %q to full view, err: %v", databaseGroup.ResourceID, err)
+			}
+			apiDatabaseGroups = append(apiDatabaseGroups, fullDatabaseGroup)
+		} else {
+			apiDatabaseGroups = append(apiDatabaseGroups, convertStoreToAPIDatabaseGroupBasic(databaseGroup, project.ResourceID))
+		}
 	}
 	return &v1pb.ListDatabaseGroupsResponse{
 		DatabaseGroups: apiDatabaseGroups,
@@ -231,11 +238,15 @@ func (s *DatabaseGroupService) ListDatabaseGroups(ctx context.Context, request *
 
 // GetDatabaseGroup gets a database group.
 func (s *DatabaseGroupService) GetDatabaseGroup(ctx context.Context, request *v1pb.GetDatabaseGroupRequest) (*v1pb.DatabaseGroup, error) {
-	projectResourceID, databaseGroupResourceID, err := common.GetProjectIDDatabaseGroupID(request.Name)
+	return getDatabaseGroupByName(ctx, s.store, request.Name, request.View)
+}
+
+func getDatabaseGroupByName(ctx context.Context, stores *store.Store, databaseGroupName string, view v1pb.DatabaseGroupView) (*v1pb.DatabaseGroup, error) {
+	projectResourceID, databaseGroupResourceID, err := common.GetProjectIDDatabaseGroupID(databaseGroupName)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	project, err := s.store.GetProjectV2(ctx, &store.FindProjectMessage{
+	project, err := stores.GetProjectV2(ctx, &store.FindProjectMessage{
 		ResourceID: &projectResourceID,
 	})
 	if err != nil {
@@ -244,7 +255,7 @@ func (s *DatabaseGroupService) GetDatabaseGroup(ctx context.Context, request *v1
 	if project == nil {
 		return nil, status.Errorf(codes.NotFound, "project %q not found", projectResourceID)
 	}
-	databaseGroup, err := s.store.GetDatabaseGroup(ctx, &store.FindDatabaseGroupMessage{
+	databaseGroup, err := stores.GetDatabaseGroup(ctx, &store.FindDatabaseGroupMessage{
 		ProjectID:  &project.ResourceID,
 		ResourceID: &databaseGroupResourceID,
 	})
@@ -254,14 +265,14 @@ func (s *DatabaseGroupService) GetDatabaseGroup(ctx context.Context, request *v1
 	if databaseGroup == nil {
 		return nil, status.Errorf(codes.NotFound, "database group %q not found", databaseGroupResourceID)
 	}
-	if request.View == v1pb.DatabaseGroupView_DATABASE_GROUP_VIEW_BASIC || request.View == v1pb.DatabaseGroupView_DATABASE_GROUP_VIEW_UNSPECIFIED {
-		return convertStoreToAPIDatabaseGroupBasic(databaseGroup, projectResourceID), nil
+	if view == v1pb.DatabaseGroupView_DATABASE_GROUP_VIEW_FULL {
+		return convertStoreToAPIDatabaseGroupFull(ctx, stores, databaseGroup, projectResourceID)
 	}
-	return s.convertStoreToAPIDatabaseGroupFull(ctx, databaseGroup, projectResourceID)
+	return convertStoreToAPIDatabaseGroupBasic(databaseGroup, projectResourceID), nil
 }
 
-func (s *DatabaseGroupService) convertStoreToAPIDatabaseGroupFull(ctx context.Context, databaseGroup *store.DatabaseGroupMessage, projectResourceID string) (*v1pb.DatabaseGroup, error) {
-	databases, err := s.store.ListDatabases(ctx, &store.FindDatabaseMessage{
+func convertStoreToAPIDatabaseGroupFull(ctx context.Context, stores *store.Store, databaseGroup *store.DatabaseGroupMessage, projectResourceID string) (*v1pb.DatabaseGroup, error) {
+	databases, err := stores.ListDatabases(ctx, &store.FindDatabaseMessage{
 		ProjectID: &projectResourceID,
 	})
 	if err != nil {
@@ -275,12 +286,12 @@ func (s *DatabaseGroupService) convertStoreToAPIDatabaseGroupFull(ctx context.Co
 	}
 	for _, database := range matches {
 		ret.MatchedDatabases = append(ret.MatchedDatabases, &v1pb.DatabaseGroup_Database{
-			Name: fmt.Sprintf("%s%s/%s%s", common.InstanceNamePrefix, database.InstanceID, common.DatabaseIDPrefix, database.DatabaseName),
+			Name: common.FormatDatabase(database.InstanceID, database.DatabaseName),
 		})
 	}
 	for _, database := range unmatches {
 		ret.UnmatchedDatabases = append(ret.UnmatchedDatabases, &v1pb.DatabaseGroup_Database{
-			Name: fmt.Sprintf("%s%s/%s%s", common.InstanceNamePrefix, database.InstanceID, common.DatabaseIDPrefix, database.DatabaseName),
+			Name: common.FormatDatabase(database.InstanceID, database.DatabaseName),
 		})
 	}
 	return ret, nil
@@ -288,9 +299,9 @@ func (s *DatabaseGroupService) convertStoreToAPIDatabaseGroupFull(ctx context.Co
 
 func convertStoreToAPIDatabaseGroupBasic(databaseGroup *store.DatabaseGroupMessage, projectResourceID string) *v1pb.DatabaseGroup {
 	databaseGroupV1 := &v1pb.DatabaseGroup{
-		Name:                fmt.Sprintf("%s/%s%s", common.FormatProject(projectResourceID), common.DatabaseGroupNamePrefix, databaseGroup.ResourceID),
-		DatabasePlaceholder: databaseGroup.Placeholder,
-		DatabaseExpr:        databaseGroup.Expression,
+		Name:         fmt.Sprintf("%s/%s%s", common.FormatProject(projectResourceID), common.DatabaseGroupNamePrefix, databaseGroup.ResourceID),
+		Title:        databaseGroup.Placeholder,
+		DatabaseExpr: databaseGroup.Expression,
 	}
 	return databaseGroupV1
 }

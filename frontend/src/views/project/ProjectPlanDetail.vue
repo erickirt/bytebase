@@ -1,5 +1,5 @@
 <template>
-  <div class="-mx-4 h-full relative overflow-x-hidden">
+  <div class="relative overflow-x-hidden h-full">
     <template v-if="ready">
       <PlanDetailPage />
     </template>
@@ -7,36 +7,21 @@
       <NSpin />
     </div>
   </div>
-  <FeatureModal
-    :open="state.showFeatureModal"
-    feature="bb.feature.multi-tenancy"
-    @cancel="state.showFeatureModal = false"
-  />
 </template>
 
 <script lang="ts" setup>
 import { useTitle } from "@vueuse/core";
-import Emittery from "emittery";
 import { NSpin } from "naive-ui";
-import { computed, reactive, toRef } from "vue";
+import { computed, toRef } from "vue";
 import { useI18n } from "vue-i18n";
-import { FeatureModal } from "@/components/FeatureGuard";
 import {
   providePlanContext,
   useBasePlanContext,
   useInitializePlan,
 } from "@/components/Plan";
 import PlanDetailPage from "@/components/Plan/PlanDetailPage.vue";
-import {
-  providePlanCheckRunContext,
-  type PlanCheckRunEvents,
-} from "@/components/PlanCheckRun/context";
 import { useBodyLayoutContext } from "@/layouts/common";
 import { isValidPlanName } from "@/utils";
-
-interface LocalState {
-  showFeatureModal: boolean;
-}
 
 defineOptions({
   inheritAttrs: false,
@@ -44,60 +29,38 @@ defineOptions({
 
 const props = defineProps<{
   projectId: string;
-  planSlug: string;
+  planId: string;
 }>();
 
 const { t } = useI18n();
-
-const state = reactive<LocalState>({
-  showFeatureModal: false,
-});
-
-const { isCreating, plan, isInitializing, reInitialize } = useInitializePlan(
-  toRef(props, "planSlug"),
-  toRef(props, "projectId")
-);
-const ready = computed(() => {
-  return !isInitializing.value && !!plan.value;
-});
+const { isCreating, plan, planCheckRunList, isInitializing } =
+  useInitializePlan(toRef(props, "planId"), toRef(props, "projectId"));
 const planBaseContext = useBasePlanContext({
   isCreating,
-  ready,
   plan,
+});
+
+const ready = computed(() => {
+  return !isInitializing.value && !!plan.value;
 });
 
 providePlanContext(
   {
     isCreating,
     plan,
-    ready,
-    reInitialize,
+    planCheckRunList,
     ...planBaseContext,
-  },
-  true /* root */
-);
-
-providePlanCheckRunContext(
-  {
-    events: (() => {
-      const emittery: PlanCheckRunEvents = new Emittery();
-      emittery.on("status-changed", () => {
-        // If the status of plan checks changes, trigger a refresh.
-        planBaseContext.events?.emit("status-changed", { eager: true });
-      });
-      return emittery;
-    })(),
   },
   true /* root */
 );
 
 const { overrideMainContainerClass } = useBodyLayoutContext();
 
-overrideMainContainerClass("!py-0");
+overrideMainContainerClass("!py-0 !px-0");
 
 const documentTitle = computed(() => {
   if (isCreating.value) {
-    return t("issue.new-issue");
+    return t("plan.new-plan");
   } else {
     if (ready.value && isValidPlanName(plan.value.name)) {
       return plan.value.title;

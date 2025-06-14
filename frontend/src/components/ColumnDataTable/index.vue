@@ -24,6 +24,7 @@ import {
 } from "@/store";
 import type { ComposedDatabase } from "@/types";
 import { Engine } from "@/types/proto/v1/common";
+import { PlanFeature } from "@/types/proto/v1/subscription_service";
 import type {
   ColumnMetadata,
   TableMetadata,
@@ -63,7 +64,7 @@ const engine = computed(() => {
 const subscriptionV1Store = useSubscriptionV1Store();
 
 const hasSensitiveDataFeature = computed(() => {
-  return subscriptionV1Store.hasFeature("bb.feature.sensitive-data");
+  return subscriptionV1Store.hasFeature(PlanFeature.FEATURE_DATA_MASKING);
 });
 
 const showSensitiveColumn = computed(() => {
@@ -79,7 +80,8 @@ const showSensitiveColumn = computed(() => {
       engine.value === Engine.MSSQL ||
       engine.value === Engine.BIGQUERY ||
       engine.value === Engine.RISINGWAVE ||
-      engine.value === Engine.SPANNER)
+      engine.value === Engine.SPANNER ||
+      engine.value === Engine.TRINO)
   );
 });
 
