@@ -31,22 +31,3 @@ type FinderContext struct {
 	// Database, Table
 	IgnoreCaseSensitive bool
 }
-
-// Copy returns the deep copy.
-func (ctx *FinderContext) Copy() *FinderContext {
-	return &FinderContext{
-		CheckIntegrity:      ctx.CheckIntegrity,
-		EngineType:          ctx.EngineType,
-		IgnoreCaseSensitive: ctx.IgnoreCaseSensitive,
-	}
-}
-
-// Finder is the service for finding schema information in database.
-type Finder struct {
-	Origin *DatabaseState
-}
-
-// NewFinder creates a new finder.
-func NewFinder(database *storepb.DatabaseSchemaMetadata, ctx *FinderContext) *Finder {
-	return &Finder{Origin: newDatabaseState(database, ctx)}
-}
